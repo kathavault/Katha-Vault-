@@ -1,5 +1,6 @@
-// src/app/story/[slug]/page.tsx
-'use client'; // Make this a client component to use hooks
+
+"use client";
+
 
 import type { NextPage } from 'next';
 import Image from 'next/image';
@@ -392,30 +393,6 @@ const StoryDetailPage: NextPage<StoryPageProps> = ({ params }) => {
   );
 };
 
-// Metadata generation remains server-side
-export async function generateMetadata({ params }: StoryPageProps) {
-  const story = await getStoryBySlug(params.slug);
-  if (!story) {
-    return { title: 'Story Not Found | Katha Vault' };
-  }
-  return {
-    title: `${story.title} by ${story.author} | Katha Vault`,
-    description: story.description.substring(0, 160), // Truncate description for SEO
-     openGraph: {
-       title: `${story.title} by ${story.author} | Katha Vault`,
-       description: story.description.substring(0, 160),
-       images: [
-         {
-           url: story.coverImageUrl,
-           width: 400,
-           height: 600,
-           alt: `Cover for ${story.title}`,
-         },
-       ],
-       type: 'article',
-     },
-  };
-}
 
 
 export default StoryDetailPage;

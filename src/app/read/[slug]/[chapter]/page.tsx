@@ -1,5 +1,5 @@
 // src/app/read/[slug]/[chapter]/page.tsx
-'use client'; // Make this a client component to use hooks
+"use client";
 
 import type { NextPage } from 'next';
 import Link from 'next/link';
@@ -412,23 +412,5 @@ const ReadingPage: NextPage<ReadPageProps> = ({ params }) => {
     </div>
   );
 };
-
-
-// Keep generateMetadata as is - No client-side hooks allowed here
-export async function generateMetadata({ params }: ReadPageProps) {
-  const chapterNumber = parseInt(params.chapter, 10);
-  if (isNaN(chapterNumber)) return { title: 'Invalid Chapter | Katha Vault' };
-
-  // Fetch data server-side for metadata
-  const chapterData = await getChapterContent(params.slug, chapterNumber);
-  if (!chapterData) {
-    return { title: 'Chapter Not Found | Katha Vault' };
-  }
-  return {
-    title: `${chapterData.title} - ${chapterData.storyTitle} | Katha Vault Reader`,
-    description: `Read Chapter ${chapterNumber} of the story "${chapterData.storyTitle}" by ${chapterData.storyAuthor}.`,
-  };
-}
-
 
 export default ReadingPage;
