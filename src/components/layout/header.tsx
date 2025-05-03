@@ -1,6 +1,6 @@
 import type { FC } from 'react';
 import Link from 'next/link';
-import { BookOpen, Search, Menu, ChevronDown, Edit } from 'lucide-react';
+import { BookOpen, Search, Menu, ChevronDown, Edit } from 'lucide-react'; // Keep Edit icon for potential future use by logged-in users
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
@@ -50,11 +50,7 @@ const Header: FC = () => {
                    <BookOpen className="mr-2 h-5 w-5" /> Browse
                  </Link>
                </Button>
-                <Button variant="ghost" asChild className="justify-start px-4 text-lg">
-                 <Link href="/write" className="text-foreground hover:text-primary">
-                    <Edit className="mr-2 h-5 w-5" /> Write
-                 </Link>
-               </Button>
+                {/* Removed "Write" button from mobile menu */}
                {/* Add more mobile navigation links here */}
                <Separator className="my-2"/>
                {isLoggedIn ? (
@@ -73,6 +69,7 @@ const Header: FC = () => {
                   </div>
                ) : (
                  <div className="flex flex-col gap-2 px-4">
+                  {/* These buttons are still placeholders */}
                   <Button variant="outline" className="w-full text-lg">Log In</Button>
                   <Button className="w-full bg-primary text-primary-foreground hover:bg-primary/90 text-lg">Sign Up</Button>
                  </div>
@@ -113,11 +110,12 @@ const Header: FC = () => {
                  <DropdownMenuItem asChild><Link href="/community/contests">Writing Contests</Link></DropdownMenuItem>
                </DropdownMenuContent>
              </DropdownMenu>
-             <Button variant="ghost" asChild className="text-foreground hover:text-primary font-medium">
+             {/* Removed "Write" button from main navigation */}
+             {/* <Button variant="ghost" asChild className="text-foreground hover:text-primary font-medium">
               <Link href="/write">
                 Write
               </Link>
-            </Button>
+            </Button> */}
           </nav>
           {/* Search Bar */}
            <div className="relative w-full max-w-xs lg:max-w-sm hidden sm:block">
@@ -134,7 +132,7 @@ const Header: FC = () => {
         {/* Right Section - Actions */}
         <div className="flex items-center gap-2 shrink-0">
            {isLoggedIn ? (
-              // Logged-in state: Notifications, Write, Profile Dropdown
+              // Logged-in state: Notifications, Profile Dropdown
                <>
                  {/* Notification Bell Placeholder */}
                  {/* <Button variant="ghost" size="icon">
@@ -158,6 +156,8 @@ const Header: FC = () => {
                      <DropdownMenuItem asChild><Link href="/profile/me">My Profile</Link></DropdownMenuItem>
                      <DropdownMenuItem asChild><Link href="/myworks">My Stories</Link></DropdownMenuItem>
                      <DropdownMenuItem asChild><Link href="/library">Library</Link></DropdownMenuItem>
+                     {/* Optionally add "Write" link here for logged-in users */}
+                     {/* <DropdownMenuItem asChild><Link href="/write">Write</Link></DropdownMenuItem> */}
                      <DropdownMenuItem asChild><Link href="/settings">Settings</Link></DropdownMenuItem>
                      <Separator />
                      <DropdownMenuItem className="text-destructive focus:text-destructive focus:bg-destructive/10">
@@ -169,6 +169,7 @@ const Header: FC = () => {
            ) : (
              // Logged-out state: Log In, Sign Up
              <>
+               {/* These buttons are still placeholders - functionality needs implementation */}
                <Button variant="ghost" className="hidden md:inline-flex text-foreground hover:text-primary font-medium">Log In</Button>
                <Button className="bg-primary text-primary-foreground hover:bg-primary/90 font-medium">Sign Up</Button>
              </>
