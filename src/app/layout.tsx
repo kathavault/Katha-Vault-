@@ -1,11 +1,11 @@
 import type { Metadata } from 'next';
-import { Inter } from 'next/font/google'; // Using Inter as a clean default font
+// Removed Inter font import, will rely on body style in globals.css
 import './globals.css';
 import Header from '@/components/layout/header';
 import Footer from '@/components/layout/footer';
 import { Toaster } from "@/components/ui/toaster"; // Import Toaster
 
-const inter = Inter({ subsets: ['latin'] });
+// const inter = Inter({ subsets: ['latin'] }); // Removed Inter
 
 export const metadata: Metadata = {
   title: 'StoryVerse - Read & Write Stories',
@@ -19,9 +19,11 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={`${inter.className} antialiased flex flex-col min-h-screen`}>
+      {/* Removed inter.className, font is now set in globals.css */}
+      <body className={`antialiased flex flex-col min-h-screen bg-background`}>
         <Header />
-        <main className="flex-grow container px-4 md:px-6 py-8">
+        {/* Slightly reduced vertical padding, increased horizontal for wider screens */}
+        <main className="flex-grow container px-4 sm:px-6 lg:px-8 py-6 md:py-8">
           {children}
         </main>
         <Footer />

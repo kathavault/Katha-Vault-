@@ -3,53 +3,55 @@
 @tailwind utilities;
 
 body {
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: "Helvetica Neue", Helvetica, Arial, sans-serif; /* Closer to Wattpad's font stack */
 }
 
 @layer base {
   :root {
-    /* Wattpad Inspired Theme */
-    --background: 220 27% 97%; /* Light Gray (#F0F2F5) */
-    --foreground: 0 0% 15%; /* Dark Gray for text */
-    --card: 0 0% 100%;
-    --card-foreground: 0 0% 15%;
+    /* Refined Wattpad Inspired Theme */
+    --background: 0 0% 98%; /* Lighter Gray (#FAFAFA) */
+    --foreground: 0 0% 13%; /* Very Dark Gray for text (#222222) */
+    --card: 0 0% 100%; /* White */
+    --card-foreground: 0 0% 13%;
     --popover: 0 0% 100%;
-    --popover-foreground: 0 0% 15%;
+    --popover-foreground: 0 0% 13%;
     --primary: 19 100% 50%; /* Wattpad Orange (#FF5000) */
     --primary-foreground: 0 0% 100%; /* White */
-    --secondary: 220 27% 92%; /* Slightly darker gray for secondary elements */
-    --secondary-foreground: 0 0% 9%;
-    --muted: 220 27% 92%;
-    --muted-foreground: 0 0% 45.1%;
-    --accent: 180 100% 25%; /* Teal (#008080) */
+    --secondary: 0 0% 94%; /* Lighter Gray (#F0F0F0) for secondary elements */
+    --secondary-foreground: 0 0% 20%; /* Darker secondary text */
+    --muted: 0 0% 94%; /* Lighter Gray (#F0F0F0) */
+    --muted-foreground: 0 0% 40%; /* Medium Gray for muted text (#666666) */
+    --accent: 180 100% 29%; /* Slightly darker Teal (#009494) */
     --accent-foreground: 0 0% 100%; /* White */
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 0 0% 98%;
-    --border: 220 13% 88%; /* Lighter border */
+    --border: 0 0% 88%; /* Lighter border (#E0E0E0) */
     --input: 0 0% 100%; /* White input background */
-    --input-border: 220 13% 80%; /* Slightly darker input border */
-    --ring: 180 100% 35%; /* Teal for focus rings */
+    --input-border: 0 0% 88%; /* Lighter input border to match general border */
+    --ring: 19 90% 55%; /* Slightly desaturated orange for focus rings */
 
     --chart-1: 19 100% 50%; /* Orange */
-    --chart-2: 180 100% 25%; /* Teal */
-    --chart-3: 220 27% 60%; /* Gray */
+    --chart-2: 180 100% 29%; /* Teal */
+    --chart-3: 0 0% 60%;   /* Medium Gray */
     --chart-4: 43 74% 66%;
     --chart-5: 27 87% 67%;
 
-    --radius: 0.5rem;
+    --radius: 0.6rem; /* Slightly more rounded */
 
+    /* Sidebar specific theme (can be adjusted if sidebar is heavily used/styled) */
     --sidebar-background: 0 0% 100%; /* White */
-    --sidebar-foreground: 0 0% 15%; /* Dark Gray */
+    --sidebar-foreground: 0 0% 13%; /* Dark Gray */
     --sidebar-primary: 19 100% 50%; /* Orange */
     --sidebar-primary-foreground: 0 0% 100%; /* White */
-    --sidebar-accent: 220 27% 95%; /* Very Light Gray */
+    --sidebar-accent: 0 0% 95%; /* Very Light Gray */
     --sidebar-accent-foreground: 19 100% 50%; /* Orange */
-    --sidebar-border: 220 13% 88%; /* Light border */
+    --sidebar-border: 0 0% 88%; /* Light border */
     --sidebar-ring: 180 100% 35%; /* Teal */
   }
 
   /* Dark theme is not specified, but keeping the structure */
   .dark {
+    /* Placeholder dark theme - needs refinement if dark mode is implemented */
     --background: 240 10% 3.9%;
     --foreground: 0 0% 98%;
     --card: 240 10% 3.9%;
@@ -69,11 +71,11 @@ body {
     --border: 240 3.7% 15.9%;
     --input: 240 3.7% 15.9%;
     --input-border: 240 3.7% 25%;
-    --ring: 180 100% 40%;
+    --ring: 19 90% 60%;
 
     --chart-1: 19 100% 55%;
     --chart-2: 180 100% 35%;
-    --chart-3: 220 15% 50%;
+    --chart-3: 0 0% 50%;
     --chart-4: 43 74% 66%;
     --chart-5: 27 87% 67%;
 
@@ -103,9 +105,17 @@ body {
      /* Apply the specific border color for input elements using the CSS variable */
      border-color: hsl(var(--input-border));
   }
+   /* Remove default browser focus outline and rely on Tailwind's ring */
+   *:focus {
+     outline: none;
+   }
+   *:focus-visible {
+      @apply ring-2 ring-ring ring-offset-2 ring-offset-background;
+   }
+
   /* Style headings */
   h1, h2, h3, h4, h5, h6 {
-    @apply font-semibold tracking-tight;
+    @apply font-semibold tracking-tight text-foreground; /* Ensure headings use foreground color */
   }
   h1 { @apply text-3xl; }
   h2 { @apply text-2xl; }
@@ -115,4 +125,49 @@ body {
   button, a {
      @apply transition-colors duration-150 ease-in-out;
   }
+
+  /* Basic prose styling for reading view */
+   .prose {
+     color: hsl(var(--foreground));
+     line-height: 1.7;
+   }
+   .prose h1, .prose h2, .prose h3, .prose h4, .prose h5, .prose h6 {
+     color: hsl(var(--foreground));
+     margin-top: 1.5em;
+     margin-bottom: 0.5em;
+   }
+   .prose p {
+     margin-bottom: 1.25em;
+   }
+   .prose a {
+     color: hsl(var(--primary));
+     text-decoration: none;
+   }
+   .prose a:hover {
+     text-decoration: underline;
+   }
+   .prose strong {
+     color: hsl(var(--foreground));
+   }
+   /* Add more prose styles as needed */
+}
+
+/* Custom scrollbar styling (optional, for a more polished look) */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: hsl(var(--secondary));
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: hsl(var(--muted-foreground) / 0.5);
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: hsl(var(--muted-foreground) / 0.7);
 }

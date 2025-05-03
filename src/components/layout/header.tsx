@@ -1,84 +1,180 @@
 import type { FC } from 'react';
 import Link from 'next/link';
-import { BookOpen, Search, Menu } from 'lucide-react';
+import { BookOpen, Search, Menu, ChevronDown, Edit } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { Separator } from '@/components/ui/separator';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"; // Added for profile placeholder
 
 const Header: FC = () => {
+  // Placeholder for user authentication status
+  const isLoggedIn = false; // Change this based on actual auth state
+
   return (
-    <header className="sticky top-0 z-50 w-full border-b bg-card shadow-sm">
-      <div className="container flex h-16 items-center justify-between px-4 md:px-6">
-        {/* Left Section - Logo and Desktop Nav */}
-        <div className="flex items-center gap-4">
-          <Link href="/" className="flex items-center gap-2 text-primary hover:opacity-80 transition-opacity">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-8 h-8">
-              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z"/>
-              <path d="M12 7c-2.76 0-5 2.24-5 5s2.24 5 5 5 5-2.24 5-5-2.24-5-5-5zm0 8c-1.65 0-3-1.35-3-3s1.35-3 3-3 3 1.35 3 3-1.35 3-3 3z"/>
-            </svg>
-            <span className="text-xl font-bold text-primary">StoryVerse</span>
-          </Link>
-          <nav className="hidden md:flex items-center gap-4">
-            <Button variant="ghost" asChild>
-              <Link href="/browse" className="text-foreground hover:text-primary">
-                <BookOpen className="mr-2 h-4 w-4" /> Browse
+    <header className="sticky top-0 z-50 w-full border-b bg-background shadow-sm">
+      <div className="container flex h-16 items-center justify-between px-4 md:px-6 gap-4">
+        {/* Mobile Menu Trigger (Keep first for mobile layout) */}
+        <Sheet>
+          <SheetTrigger asChild>
+            <Button variant="ghost" size="icon" className="md:hidden">
+              <Menu className="h-6 w-6" />
+              <span className="sr-only">Toggle Menu</span>
+            </Button>
+          </SheetTrigger>
+          <SheetContent side="left" className="w-[300px] sm:w-[350px] pt-10 bg-background">
+             <nav className="flex flex-col gap-4">
+                {/* Mobile Logo */}
+                <Link href="/" className="flex items-center gap-2 text-primary px-4 mb-4">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" fill="currentColor" className="w-8 h-8">
+                   <path fillRule="evenodd" clipRule="evenodd" d="M50 0C22.385 0 0 22.385 0 50C0 77.615 22.385 100 50 100C77.615 100 100 77.615 100 50C100 22.385 77.615 0 50 0ZM84.08 71.715L50 37.635L15.92 71.715C19.53 79.725 26.46 85.845 34.8 88.965C38.89 90.495 43.3 91.305 47.87 91.305H52.13C56.7 91.305 61.11 90.495 65.2 88.965C73.54 85.845 80.47 79.725 84.08 71.715ZM50 8.685C60.65 8.685 69.99 13.465 76.18 21.095L50 47.275L23.82 21.095C30.01 13.465 39.35 8.685 50 8.685Z" />
+                 </svg>
+                  <span className="text-2xl font-bold text-primary">StoryVerse</span>
+                </Link>
+               <div className="relative mb-4 px-4">
+                   <Search className="absolute left-7 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                   <Input
+                     type="search"
+                     placeholder="Search stories..."
+                     className="w-full pl-10 rounded-full bg-secondary border-transparent focus:border-border focus:bg-background"
+                   />
+                 </div>
+               <Button variant="ghost" asChild className="justify-start px-4 text-lg">
+                 <Link href="/browse" className="text-foreground hover:text-primary">
+                   <BookOpen className="mr-2 h-5 w-5" /> Browse
+                 </Link>
+               </Button>
+                <Button variant="ghost" asChild className="justify-start px-4 text-lg">
+                 <Link href="/write" className="text-foreground hover:text-primary">
+                    <Edit className="mr-2 h-5 w-5" /> Write
+                 </Link>
+               </Button>
+               {/* Add more mobile navigation links here */}
+               <Separator className="my-2"/>
+               {isLoggedIn ? (
+                 <div className="px-4">
+                    {/* Mobile Profile Button Placeholder */}
+                    <Button variant="ghost" className="w-full justify-start text-lg">
+                      <Avatar className="h-6 w-6 mr-2">
+                          <AvatarImage src="https://picsum.photos/seed/profile/100/100" alt="User" data-ai-hint="user avatar" />
+                          <AvatarFallback>U</AvatarFallback>
+                      </Avatar>
+                      My Profile
+                    </Button>
+                    <Button variant="ghost" className="w-full justify-start text-lg text-destructive hover:text-destructive/90 mt-2">
+                       Log Out
+                     </Button>
+                  </div>
+               ) : (
+                 <div className="flex flex-col gap-2 px-4">
+                  <Button variant="outline" className="w-full text-lg">Log In</Button>
+                  <Button className="w-full bg-primary text-primary-foreground hover:bg-primary/90 text-lg">Sign Up</Button>
+                 </div>
+               )}
+             </nav>
+          </SheetContent>
+        </Sheet>
+
+        {/* Left Section - Logo */}
+        <Link href="/" className="flex items-center gap-2 text-primary hover:opacity-80 transition-opacity shrink-0">
+           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" fill="currentColor" className="w-10 h-10">
+             {/* Wattpad-like W logo */}
+             <path fillRule="evenodd" clipRule="evenodd" d="M50 0C22.385 0 0 22.385 0 50C0 77.615 22.385 100 50 100C77.615 100 100 77.615 100 50C100 22.385 77.615 0 50 0ZM84.08 71.715L50 37.635L15.92 71.715C19.53 79.725 26.46 85.845 34.8 88.965C38.89 90.495 43.3 91.305 47.87 91.305H52.13C56.7 91.305 61.11 90.495 65.2 88.965C73.54 85.845 80.47 79.725 84.08 71.715ZM50 8.685C60.65 8.685 69.99 13.465 76.18 21.095L50 47.275L23.82 21.095C30.01 13.465 39.35 8.685 50 8.685Z" />
+           </svg>
+           {/* Hide text on smaller screens if needed */}
+           {/* <span className="text-2xl font-bold text-primary hidden sm:inline">StoryVerse</span> */}
+         </Link>
+
+
+        {/* Center Section - Navigation & Search */}
+        <div className="flex flex-1 items-center justify-center gap-4 md:gap-6">
+          <nav className="hidden md:flex items-center gap-1">
+            <Button variant="ghost" asChild className="text-foreground hover:text-primary font-medium">
+              <Link href="/browse">
+                Browse
               </Link>
             </Button>
-            {/* Add more navigation links here if needed */}
+            {/* "Create" Dropdown */}
+             <DropdownMenu>
+               <DropdownMenuTrigger asChild>
+                 <Button variant="ghost" className="text-foreground hover:text-primary font-medium">
+                   Community <ChevronDown className="ml-1 h-4 w-4" />
+                 </Button>
+               </DropdownMenuTrigger>
+               <DropdownMenuContent align="start">
+                 <DropdownMenuItem asChild><Link href="/community/forums">Forums</Link></DropdownMenuItem>
+                 <DropdownMenuItem asChild><Link href="/community/awards">Awards</Link></DropdownMenuItem>
+                 <DropdownMenuItem asChild><Link href="/community/contests">Writing Contests</Link></DropdownMenuItem>
+               </DropdownMenuContent>
+             </DropdownMenu>
+             <Button variant="ghost" asChild className="text-foreground hover:text-primary font-medium">
+              <Link href="/write">
+                Write
+              </Link>
+            </Button>
           </nav>
+          {/* Search Bar */}
+           <div className="relative w-full max-w-xs lg:max-w-sm hidden sm:block">
+             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+             <Input
+               type="search"
+               placeholder="Search stories & people..."
+               className="w-full pl-10 rounded-full bg-secondary border-transparent focus:border-border focus:bg-background"
+             />
+           </div>
         </div>
 
-        {/* Center Section - Search Bar */}
-        <div className="flex-1 mx-4 hidden sm:block max-w-md">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              type="search"
-              placeholder="Search stories & people..."
-              className="w-full pl-10 rounded-full"
-            />
-          </div>
-        </div>
 
-        {/* Right Section - Actions & Mobile Menu */}
-        <div className="flex items-center gap-2">
-           {/* Placeholder for Login/Signup/Profile */}
-           <Button variant="outline" className="hidden md:inline-flex">Log In</Button>
-           <Button className="hidden md:inline-flex bg-accent text-accent-foreground hover:bg-accent/90">Sign Up</Button>
+        {/* Right Section - Actions */}
+        <div className="flex items-center gap-2 shrink-0">
+           {isLoggedIn ? (
+              // Logged-in state: Notifications, Write, Profile Dropdown
+               <>
+                 {/* Notification Bell Placeholder */}
+                 {/* <Button variant="ghost" size="icon">
+                   <Bell className="h-5 w-5" />
+                   <span className="sr-only">Notifications</span>
+                 </Button> */}
 
-           {/* Mobile Menu */}
-           <Sheet>
-              <SheetTrigger asChild>
-                <Button variant="ghost" size="icon" className="md:hidden">
-                  <Menu className="h-6 w-6" />
-                  <span className="sr-only">Toggle Menu</span>
-                </Button>
-              </SheetTrigger>
-              <SheetContent side="right" className="w-[300px] sm:w-[400px] pt-10">
-                 <nav className="flex flex-col gap-4">
-                   <div className="relative mb-4 px-4">
-                       <Search className="absolute left-7 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                       <Input
-                         type="search"
-                         placeholder="Search stories & people..."
-                         className="w-full pl-10 rounded-full"
-                       />
-                     </div>
-                   <Button variant="ghost" asChild className="justify-start px-4">
-                     <Link href="/browse" className="text-foreground hover:text-primary">
-                       <BookOpen className="mr-2 h-4 w-4" /> Browse
-                     </Link>
-                   </Button>
-                   {/* Add more mobile navigation links here */}
-                   <Separator className="my-2"/>
-                   <div className="flex flex-col gap-2 px-4">
-                    <Button variant="outline" className="w-full">Log In</Button>
-                    <Button className="w-full bg-accent text-accent-foreground hover:bg-accent/90">Sign Up</Button>
-                   </div>
-                 </nav>
-              </SheetContent>
-            </Sheet>
+                 {/* Profile Dropdown */}
+                 <DropdownMenu>
+                   <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" className="flex items-center gap-2">
+                         <Avatar className="h-8 w-8">
+                           <AvatarImage src="https://picsum.photos/seed/profile/100/100" alt="User" data-ai-hint="user avatar logged in" />
+                           <AvatarFallback>U</AvatarFallback>
+                         </Avatar>
+                         <span className="hidden sm:inline">Username</span>
+                         <ChevronDown className="ml-1 h-4 w-4" />
+                       </Button>
+                   </DropdownMenuTrigger>
+                   <DropdownMenuContent align="end">
+                     <DropdownMenuItem asChild><Link href="/profile/me">My Profile</Link></DropdownMenuItem>
+                     <DropdownMenuItem asChild><Link href="/myworks">My Stories</Link></DropdownMenuItem>
+                     <DropdownMenuItem asChild><Link href="/library">Library</Link></DropdownMenuItem>
+                     <DropdownMenuItem asChild><Link href="/settings">Settings</Link></DropdownMenuItem>
+                     <Separator />
+                     <DropdownMenuItem className="text-destructive focus:text-destructive focus:bg-destructive/10">
+                       Log Out
+                     </DropdownMenuItem>
+                   </DropdownMenuContent>
+                 </DropdownMenu>
+               </>
+           ) : (
+             // Logged-out state: Log In, Sign Up
+             <>
+               <Button variant="ghost" className="hidden md:inline-flex text-foreground hover:text-primary font-medium">Log In</Button>
+               <Button className="bg-primary text-primary-foreground hover:bg-primary/90 font-medium">Sign Up</Button>
+             </>
+           )}
+
+
         </div>
       </div>
     </header>
