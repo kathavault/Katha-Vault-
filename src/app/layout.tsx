@@ -8,8 +8,8 @@ import { Toaster } from "@/components/ui/toaster"; // Import Toaster
 // const inter = Inter({ subsets: ['latin'] }); // Removed Inter
 
 export const metadata: Metadata = {
-  title: 'StoryVerse - Read & Write Stories',
-  description: 'Discover and share original stories on StoryVerse. Inspired by Wattpad.',
+  title: 'Katha Vault - Read & Write Stories',
+  description: 'Discover and share original stories on Katha Vault.',
 };
 
 export default function RootLayout({

@@ -176,7 +176,7 @@ const Home: NextPage = () => {
     <div className="space-y-12 md:space-y-16">
       {/* Hero Section - Enhanced */}
       <section className="text-center py-16 px-4 bg-gradient-to-b from-primary/5 via-background to-background rounded-lg border border-border/50 shadow-sm">
-        <h1 className="text-4xl sm:text-5xl font-bold mb-4 text-primary">Your Next Obsession Awaits</h1>
+        <h1 className="text-4xl sm:text-5xl font-bold mb-4 text-primary">Your Next Obsession Awaits at Katha Vault</h1>
         <p className="text-lg text-muted-foreground mb-8 max-w-3xl mx-auto">
           Join a global community of readers and writers. Discover original stories across all genres, or share your own voice with the world.
         </p>

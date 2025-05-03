@@ -92,7 +92,7 @@ const StoryDetailPage: NextPage<StoryPageProps> = async ({ params }) => {
 
           <div className="flex flex-col gap-3">
              <Button size="lg" asChild className="w-full bg-primary text-primary-foreground hover:bg-primary/90 text-base font-semibold">
-               <Link href={`/read/${story.slug}/chapter/1`}> {/* Link to first chapter */}
+               <Link href={`/read/${story.slug}/1`}> {/* Link to first chapter */}
                  <BookOpen className="mr-2 h-5 w-5" /> Read First Chapter
                </Link>
              </Button>
@@ -195,7 +195,7 @@ const StoryDetailPage: NextPage<StoryPageProps> = async ({ params }) => {
 
 
         {/* Table of Contents */}
-        <Card className="border border-border/80 shadow-sm">
+        <Card id="chapters" className="border border-border/80 shadow-sm scroll-mt-20"> {/* Add scroll margin */}
           <CardHeader className="border-b border-border/80">
             <CardTitle className="flex items-center gap-2 text-xl font-semibold">
                <List className="w-5 h-5" /> Table of Contents ({story.chapters} Parts)
@@ -205,7 +205,7 @@ const StoryDetailPage: NextPage<StoryPageProps> = async ({ params }) => {
              <ul className="divide-y divide-border/60">
                {story.chaptersData.map((chapter, index) => (
                   <li key={chapter.id}>
-                     <Link href={`/read/${story.slug}/chapter/${index + 1}`} className="flex justify-between items-center p-4 hover:bg-secondary transition-colors duration-150 group">
+                     <Link href={`/read/${story.slug}/${index + 1}`} className="flex justify-between items-center p-4 hover:bg-secondary transition-colors duration-150 group">
                        <span className="font-medium group-hover:text-primary">{chapter.title}</span>
                        <span className="text-sm text-muted-foreground">
                           {/* Placeholder for chapter read time or date */}
@@ -252,14 +252,14 @@ const StoryDetailPage: NextPage<StoryPageProps> = async ({ params }) => {
 export async function generateMetadata({ params }: StoryPageProps) {
   const story = await getStoryBySlug(params.slug);
   if (!story) {
-    return { title: 'Story Not Found | StoryVerse' };
+    return { title: 'Story Not Found | Katha Vault' };
   }
   return {
-    title: `${story.title} by ${story.author} | StoryVerse`,
+    title: `${story.title} by ${story.author} | Katha Vault`,
     description: story.description.substring(0, 160), // Truncate description for SEO
     // Add OpenGraph metadata if desired
      openGraph: {
-       title: `${story.title} by ${story.author} | StoryVerse`,
+       title: `${story.title} by ${story.author} | Katha Vault`,
        description: story.description.substring(0, 160),
        images: [
          {

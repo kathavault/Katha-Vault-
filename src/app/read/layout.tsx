@@ -7,7 +7,7 @@ const inter = Inter({ subsets: ['latin'] });
 
 // Metadata can be dynamic based on the reading content, handled in the page component
 export const metadata: Metadata = {
-  title: 'StoryVerse Reader',
+  title: 'Katha Vault Reader',
   description: 'Immerse yourself in the story.',
 };
 

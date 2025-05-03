@@ -8,85 +8,85 @@ body {
 
 @layer base {
   :root {
-    /* Refined Wattpad Inspired Theme */
-    --background: 0 0% 98%; /* Lighter Gray (#FAFAFA) */
-    --foreground: 0 0% 13%; /* Very Dark Gray for text (#222222) */
+    /* Katha Vault Theme based on #2A1A46 (Dark Purple) and #B4317B (Magenta) */
+    --background: 0 0% 98%; /* Keep light background for readability (#FAFAFA) */
+    --foreground: 260 45% 19%; /* Dark Purple (#2A1A46) for text */
     --card: 0 0% 100%; /* White */
-    --card-foreground: 0 0% 13%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 0 0% 13%;
-    --primary: 19 100% 50%; /* Wattpad Orange (#FF5000) */
+    --card-foreground: 260 45% 19%; /* Dark Purple */
+    --popover: 0 0% 100%; /* White */
+    --popover-foreground: 260 45% 19%; /* Dark Purple */
+    --primary: 322 58% 45%; /* Magenta (#B4317B) */
     --primary-foreground: 0 0% 100%; /* White */
-    --secondary: 0 0% 94%; /* Lighter Gray (#F0F0F0) for secondary elements */
-    --secondary-foreground: 0 0% 20%; /* Darker secondary text */
-    --muted: 0 0% 94%; /* Lighter Gray (#F0F0F0) */
-    --muted-foreground: 0 0% 40%; /* Medium Gray for muted text (#666666) */
-    --accent: 180 100% 29%; /* Slightly darker Teal (#009494) */
-    --accent-foreground: 0 0% 100%; /* White */
-    --destructive: 0 84.2% 60.2%;
+    --secondary: 260 45% 92%; /* Lighter Purple for secondary elements */
+    --secondary-foreground: 260 45% 25%; /* Slightly lighter Dark Purple */
+    --muted: 260 45% 95%; /* Very Light Purple/Gray */
+    --muted-foreground: 260 20% 50%; /* Muted Purple/Gray text */
+    --accent: 322 58% 70%; /* Lighter Magenta as accent */
+    --accent-foreground: 0 0% 100%; /* White text on lighter magenta */
+    --destructive: 0 84.2% 60.2%; /* Keep default red for destructive actions */
     --destructive-foreground: 0 0% 98%;
-    --border: 0 0% 88%; /* Lighter border (#E0E0E0) */
+    --border: 260 20% 88%; /* Light purple-gray border */
     --input: 0 0% 100%; /* White input background */
-    --input-border: 0 0% 88%; /* Lighter input border to match general border */
-    --ring: 19 90% 55%; /* Slightly desaturated orange for focus rings */
+    --input-border: 260 20% 88%; /* Use border color for input */
+    --ring: 322 58% 55%; /* Slightly lighter Magenta for focus rings */
 
-    --chart-1: 19 100% 50%; /* Orange */
-    --chart-2: 180 100% 29%; /* Teal */
-    --chart-3: 0 0% 60%;   /* Medium Gray */
-    --chart-4: 43 74% 66%;
-    --chart-5: 27 87% 67%;
+    --chart-1: 322 58% 45%; /* Primary Magenta */
+    --chart-2: 322 58% 70%; /* Accent Lighter Magenta */
+    --chart-3: 260 45% 19%; /* Foreground Dark Purple */
+    --chart-4: 180 100% 29%; /* Keep Teal as a contrast */
+    --chart-5: 260 45% 60%; /* Mid Purple */
 
     --radius: 0.6rem; /* Slightly more rounded */
 
-    /* Sidebar specific theme (can be adjusted if sidebar is heavily used/styled) */
+    /* Sidebar specific theme - Adjust if needed */
     --sidebar-background: 0 0% 100%; /* White */
-    --sidebar-foreground: 0 0% 13%; /* Dark Gray */
-    --sidebar-primary: 19 100% 50%; /* Orange */
+    --sidebar-foreground: 260 45% 19%; /* Dark Purple */
+    --sidebar-primary: 322 58% 45%; /* Magenta */
     --sidebar-primary-foreground: 0 0% 100%; /* White */
-    --sidebar-accent: 0 0% 95%; /* Very Light Gray */
-    --sidebar-accent-foreground: 19 100% 50%; /* Orange */
-    --sidebar-border: 0 0% 88%; /* Light border */
-    --sidebar-ring: 180 100% 35%; /* Teal */
+    --sidebar-accent: 260 45% 95%; /* Very Light Purple */
+    --sidebar-accent-foreground: 322 58% 45%; /* Magenta */
+    --sidebar-border: 260 20% 88%; /* Light purple-gray */
+    --sidebar-ring: 322 58% 55%; /* Lighter Magenta */
   }
 
   /* Dark theme is not specified, but keeping the structure */
   .dark {
-    /* Placeholder dark theme - needs refinement if dark mode is implemented */
-    --background: 240 10% 3.9%;
-    --foreground: 0 0% 98%;
-    --card: 240 10% 3.9%;
-    --card-foreground: 0 0% 98%;
-    --popover: 240 10% 3.9%;
-    --popover-foreground: 0 0% 98%;
-    --primary: 19 100% 55%; /* Brighter Orange for dark mode */
-    --primary-foreground: 0 0% 10%; /* Dark text */
-    --secondary: 240 3.7% 15.9%;
-    --secondary-foreground: 0 0% 98%;
-    --muted: 240 3.7% 15.9%;
-    --muted-foreground: 0 0% 63.9%;
-    --accent: 180 100% 35%; /* Brighter Teal for dark mode */
-    --accent-foreground: 0 0% 98%;
-    --destructive: 0 62.8% 30.6%;
+    /* Placeholder dark theme - needs refinement with new colors */
+    --background: 260 30% 10%; /* Darker Purple */
+    --foreground: 260 15% 95%; /* Light Purple/Gray */
+    --card: 260 30% 12%; /* Slightly Lighter Dark Purple */
+    --card-foreground: 260 15% 95%;
+    --popover: 260 30% 10%;
+    --popover-foreground: 260 15% 95%;
+    --primary: 322 65% 55%; /* Brighter Magenta */
+    --primary-foreground: 0 0% 100%;
+    --secondary: 260 30% 20%; /* Medium Dark Purple */
+    --secondary-foreground: 260 15% 90%;
+    --muted: 260 30% 20%;
+    --muted-foreground: 260 15% 65%;
+    --accent: 322 65% 75%; /* Brighter Light Magenta */
+    --accent-foreground: 260 45% 15%;
+    --destructive: 0 70% 50%; /* Adjust destructive for dark */
     --destructive-foreground: 0 0% 98%;
-    --border: 240 3.7% 15.9%;
-    --input: 240 3.7% 15.9%;
-    --input-border: 240 3.7% 25%;
-    --ring: 19 90% 60%;
+    --border: 260 20% 30%; /* Darker purple-gray border */
+    --input: 260 30% 20%;
+    --input-border: 260 20% 40%;
+    --ring: 322 65% 60%; /* Brighter focus ring */
 
-    --chart-1: 19 100% 55%;
-    --chart-2: 180 100% 35%;
-    --chart-3: 0 0% 50%;
-    --chart-4: 43 74% 66%;
-    --chart-5: 27 87% 67%;
+    --chart-1: 322 65% 55%;
+    --chart-2: 322 65% 75%;
+    --chart-3: 260 15% 95%;
+    --chart-4: 180 90% 35%; /* Adjust Teal for dark */
+    --chart-5: 260 45% 70%; /* Lighter Purple for dark */
 
-    --sidebar-background: 240 10% 3.9%;
-    --sidebar-foreground: 0 0% 98%;
-    --sidebar-primary: 19 100% 55%;
-    --sidebar-primary-foreground: 0 0% 10%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 19 100% 55%;
-    --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 180 100% 40%;
+    --sidebar-background: 260 30% 10%;
+    --sidebar-foreground: 260 15% 95%;
+    --sidebar-primary: 322 65% 55%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 260 30% 20%;
+    --sidebar-accent-foreground: 322 65% 55%;
+    --sidebar-border: 260 20% 30%;
+    --sidebar-ring: 322 65% 60%;
   }
 }
 

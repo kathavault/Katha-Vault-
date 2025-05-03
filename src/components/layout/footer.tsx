@@ -66,7 +66,7 @@ const Footer: FC = () => {
 
         {/* Copyright and attribution */}
         <div className="mt-8 pt-6 border-t border-border/60 text-center text-xs text-muted-foreground">
-          © {currentYear} StoryVerse. All rights reserved. Inspired by Wattpad.
+          © {currentYear} Katha Vault. All rights reserved.
           <span className="mx-2">|</span>
           This is a fictional platform created for demonstration purposes.
         </div>

@@ -10,7 +10,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Progress } from "@/components/ui/progress"; // Added Progress bar
-
+import React from 'react'; // Import React
 
 // Mock data - replace with actual chapter content fetching
 const getChapterContent = async (slug: string, chapterNumber: number): Promise<{ title: string; content: string, storyTitle: string, storyAuthor: string, totalChapters: number } | null> => {
@@ -82,8 +82,8 @@ const formatContent = (text: string): React.ReactNode => {
    return paragraphs.map((p, i) => {
      let content: React.ReactNode = p;
      // Simple bold/italic - can be improved significantly
-     content = content.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-     content = content.replace(/\*(.*?)\*/g, '<em>$1</em>');
+     content = p.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+     content = (content as string).replace(/\*(.*?)\*/g, '<em>$1</em>'); // Cast needed here
      // Basic blockquote
      if (p.startsWith('> ')) {
        return <blockquote key={i} className="pl-4 italic border-l-4 my-4">{p.substring(2)}</blockquote>;
@@ -94,21 +94,41 @@ const formatContent = (text: string): React.ReactNode => {
      }
      // Handle list items (very basic)
      if (p.startsWith('* ')) {
-       return <li key={i}>{p.substring(2)}</li>; // Needs wrapping in <ul> in a real parser
+        // Find subsequent list items
+        const listItems = [p];
+        let j = i + 1;
+        while (j < paragraphs.length && paragraphs[j].startsWith('* ')) {
+          listItems.push(paragraphs[j]);
+          j++;
+        }
+        // Skip the next items as they are part of this list
+        // This basic logic assumes lists are contiguous and doesn't handle nested lists well
+        // A proper parser is needed for complex lists.
+        // To make it renderable, we increment 'i' but this is hacky
+        i = j - 1;
+
+        return (
+          <ul key={i} className="list-disc pl-6 my-4">
+            {listItems.map((item, itemIndex) => (
+              <li key={itemIndex}>{item.substring(2)}</li>
+            ))}
+          </ul>
+        );
      }
+
 
      // Insert <br /> for single newlines within a paragraph block for poetry etc.
      const lines = p.split('\n').map((line, lineIndex) => (
        <React.Fragment key={lineIndex}>
-         {line}
+         {line.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/\*(.*?)\*/g, '<em>$1</em>')}
          {lineIndex < p.split('\n').length - 1 && <br />}
        </React.Fragment>
      ));
 
-     return <p key={i} dangerouslySetInnerHTML={{ __html: p.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/\*(.*?)\*/g, '<em>$1</em>').replace(/\n/g, '<br />') }} />;
-     // Using dangerouslySetInnerHTML is generally discouraged without sanitization.
-     // A proper markdown parser is safer and more feature-complete.
-     // return <p key={i}>{lines}</p>; // Use this line if not using dangerouslySetInnerHTML
+    // Use dangerouslySetInnerHTML ONLY if absolutely necessary and you trust the source/sanitize it.
+    // Prefer rendering React elements.
+    // return <p key={i} dangerouslySetInnerHTML={{ __html: p.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/\*(.*?)\*/g, '<em>$1</em>').replace(/\n/g, '<br />') }} />;
+     return <p key={i}>{lines}</p>; // Safer approach
    });
 };
 
@@ -256,14 +276,14 @@ const ReadingPage: NextPage<ReadPageProps> = async ({ params }) => {
 // Dynamic Metadata Generation
 export async function generateMetadata({ params }: ReadPageProps) {
   const chapterNumber = parseInt(params.chapter, 10);
-  if (isNaN(chapterNumber)) return { title: 'Invalid Chapter | StoryVerse' };
+  if (isNaN(chapterNumber)) return { title: 'Invalid Chapter | Katha Vault' };
 
   const chapterData = await getChapterContent(params.slug, chapterNumber);
   if (!chapterData) {
-    return { title: 'Chapter Not Found | StoryVerse' };
+    return { title: 'Chapter Not Found | Katha Vault' };
   }
   return {
-    title: `${chapterData.title} - ${chapterData.storyTitle} | StoryVerse Reader`,
+    title: `${chapterData.title} - ${chapterData.storyTitle} | Katha Vault Reader`,
     description: `Read Chapter ${chapterNumber} of the story "${chapterData.storyTitle}" by ${chapterData.storyAuthor}.`,
   };
 }

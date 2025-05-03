@@ -35,7 +35,7 @@ const Header: FC = () => {
                   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" fill="currentColor" className="w-8 h-8">
                    <path fillRule="evenodd" clipRule="evenodd" d="M50 0C22.385 0 0 22.385 0 50C0 77.615 22.385 100 50 100C77.615 100 100 77.615 100 50C100 22.385 77.615 0 50 0ZM84.08 71.715L50 37.635L15.92 71.715C19.53 79.725 26.46 85.845 34.8 88.965C38.89 90.495 43.3 91.305 47.87 91.305H52.13C56.7 91.305 61.11 90.495 65.2 88.965C73.54 85.845 80.47 79.725 84.08 71.715ZM50 8.685C60.65 8.685 69.99 13.465 76.18 21.095L50 47.275L23.82 21.095C30.01 13.465 39.35 8.685 50 8.685Z" />
                  </svg>
-                  <span className="text-2xl font-bold text-primary">StoryVerse</span>
+                  <span className="text-2xl font-bold text-primary">Katha Vault</span>
                 </Link>
                <div className="relative mb-4 px-4">
                    <Search className="absolute left-7 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -88,7 +88,7 @@ const Header: FC = () => {
              <path fillRule="evenodd" clipRule="evenodd" d="M50 0C22.385 0 0 22.385 0 50C0 77.615 22.385 100 50 100C77.615 100 100 77.615 100 50C100 22.385 77.615 0 50 0ZM84.08 71.715L50 37.635L15.92 71.715C19.53 79.725 26.46 85.845 34.8 88.965C38.89 90.495 43.3 91.305 47.87 91.305H52.13C56.7 91.305 61.11 90.495 65.2 88.965C73.54 85.845 80.47 79.725 84.08 71.715ZM50 8.685C60.65 8.685 69.99 13.465 76.18 21.095L50 47.275L23.82 21.095C30.01 13.465 39.35 8.685 50 8.685Z" />
            </svg>
            {/* Hide text on smaller screens if needed */}
-           {/* <span className="text-2xl font-bold text-primary hidden sm:inline">StoryVerse</span> */}
+           <span className="text-2xl font-bold text-primary hidden sm:inline">Katha Vault</span>
          </Link>
 
 
@@ -100,7 +100,7 @@ const Header: FC = () => {
                 Browse
               </Link>
             </Button>
-            {/* "Create" Dropdown */}
+            {/* "Community" Dropdown */}
              <DropdownMenu>
                <DropdownMenuTrigger asChild>
                  <Button variant="ghost" className="text-foreground hover:text-primary font-medium">
