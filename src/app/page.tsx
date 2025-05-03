@@ -184,10 +184,8 @@ const Home: NextPage = () => {
           <Button size="lg" asChild className="bg-primary text-primary-foreground hover:bg-primary/90 shadow-md hover:shadow-lg transition-shadow">
             <Link href="/browse">Start Reading</Link>
           </Button>
-          <Button size="lg" variant="outline" asChild className="border-primary text-primary hover:bg-primary/10 shadow-sm hover:shadow-md transition-shadow">
-            <Link href="/write">Start Writing</Link>
-          </Button>
-        </div>
+           {/* Start Writing button is removed from here and will be shown conditionally in the header for admins */}
+         </div>
       </section>
 
       {/* Trending Stories Section */}
