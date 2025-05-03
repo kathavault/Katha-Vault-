@@ -1,7 +1,10 @@
+// src/app/read/[slug]/[chapter]/page.tsx
+'use client'; // Make this a client component to use hooks
+
 import type { NextPage } from 'next';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { ChevronLeft, ChevronRight, List, Settings, MessageSquare, BookOpenText, Share2 } from 'lucide-react'; // Added icons
+import { ChevronLeft, ChevronRight, List, Settings, MessageSquare, BookOpenText, Share2, Star, ThumbsUp, Send } from 'lucide-react'; // Added icons
 import { Separator } from '@/components/ui/separator';
 import {
   DropdownMenu,
@@ -10,10 +13,23 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Progress } from "@/components/ui/progress"; // Added Progress bar
-import React from 'react'; // Import React
+import React, { useEffect, useState } from 'react'; // Import React and hooks
+import { useAuth } from '@/hooks/use-auth'; // Import useAuth hook
+import { Textarea } from '@/components/ui/textarea'; // Import Textarea
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'; // Import Card components
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'; // For comment display
+
+// Mock data structure (keep for now, will replace with actual fetching)
+interface ChapterData {
+  title: string;
+  content: string;
+  storyTitle: string;
+  storyAuthor: string;
+  totalChapters: number;
+}
 
 // Mock data - replace with actual chapter content fetching
-const getChapterContent = async (slug: string, chapterNumber: number): Promise<{ title: string; content: string, storyTitle: string, storyAuthor: string, totalChapters: number } | null> => {
+const getChapterContent = async (slug: string, chapterNumber: number): Promise<ChapterData | null> => {
   console.log("Fetching chapter content for:", slug, "Chapter:", chapterNumber);
   // Simulate API call delay
   await new Promise(resolve => setTimeout(resolve, 50));
@@ -74,8 +90,7 @@ interface ReadPageProps {
   };
 }
 
-// Helper function to format content (replace basic newlines with paragraphs, basic markdown)
-// A more robust Markdown parser (like 'marked' or 'react-markdown') is recommended for real use.
+// Helper function to format content (keep basic version)
 const formatContent = (text: string): React.ReactNode => {
    // Basic replacements - VERY limited markdown support
    const paragraphs = text.trim().split(/\n\s*\n/); // Split by double newlines
@@ -94,17 +109,12 @@ const formatContent = (text: string): React.ReactNode => {
      }
      // Handle list items (very basic)
      if (p.startsWith('* ')) {
-        // Find subsequent list items
         const listItems = [p];
         let j = i + 1;
         while (j < paragraphs.length && paragraphs[j].startsWith('* ')) {
           listItems.push(paragraphs[j]);
           j++;
         }
-        // Skip the next items as they are part of this list
-        // This basic logic assumes lists are contiguous and doesn't handle nested lists well
-        // A proper parser is needed for complex lists.
-        // To make it renderable, we increment 'i' but this is hacky
         i = j - 1;
 
         return (
@@ -116,7 +126,6 @@ const formatContent = (text: string): React.ReactNode => {
         );
      }
 
-
      // Insert <br /> for single newlines within a paragraph block for poetry etc.
      const lines = p.split('\n').map((line, lineIndex) => (
        <React.Fragment key={lineIndex}>
@@ -125,30 +134,84 @@ const formatContent = (text: string): React.ReactNode => {
        </React.Fragment>
      ));
 
-    // Use dangerouslySetInnerHTML ONLY if absolutely necessary and you trust the source/sanitize it.
-    // Prefer rendering React elements.
-    // return <p key={i} dangerouslySetInnerHTML={{ __html: p.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/\*(.*?)\*/g, '<em>$1</em>').replace(/\n/g, '<br />') }} />;
      return <p key={i}>{lines}</p>; // Safer approach
    });
 };
 
-
-const ReadingPage: NextPage<ReadPageProps> = async ({ params }) => {
+const ReadingPage: NextPage<ReadPageProps> = ({ params }) => {
   const { slug } = params;
   const chapterNumber = parseInt(params.chapter, 10);
+  const { user, isLoading: authLoading } = useAuth(); // Get user state
+  const [chapterData, setChapterData] = useState<ChapterData | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [commentText, setCommentText] = useState(''); // State for comment input
+  const [rating, setRating] = useState(0); // State for rating (0-5)
 
-  if (isNaN(chapterNumber) || chapterNumber < 1) {
-    return <div className="text-center py-20 text-destructive">Invalid chapter number specified.</div>;
+  // Fetch chapter data on mount or when params change
+   useEffect(() => {
+    const fetchChapter = async () => {
+      if (isNaN(chapterNumber) || chapterNumber < 1) {
+        setChapterData(null); // Set to null for invalid chapter
+         setIsLoading(false);
+        return;
+      }
+      setIsLoading(true);
+      const data = await getChapterContent(slug, chapterNumber);
+      setChapterData(data);
+      setIsLoading(false);
+    };
+    fetchChapter();
+  }, [slug, chapterNumber]);
+
+  // Handle comment submission (placeholder)
+  const handleCommentSubmit = () => {
+      if (!user) {
+          // Optionally prompt login
+          console.log("User must be logged in to comment.");
+          return;
+      }
+      if (commentText.trim() === '') return;
+      console.log(`Submitting comment for chapter ${chapterNumber}:`, commentText);
+      // Add actual comment submission logic here (API call)
+      setCommentText(''); // Clear input after submit
+  };
+
+   // Handle rating submission (placeholder)
+   const handleRate = (newRating: number) => {
+       if (!user) {
+           console.log("User must be logged in to rate.");
+           return;
+       }
+       setRating(newRating);
+       console.log(`Submitting rating for chapter ${chapterNumber}:`, newRating);
+       // Add actual rating submission logic here (API call)
+   };
+
+    // Handle Share (placeholder)
+   const handleShare = () => {
+      console.log("Sharing chapter:", chapterData?.title);
+      // Implement actual sharing logic (e.g., using Web Share API or social links)
+   };
+
+
+  // Loading state while fetching chapter or checking auth
+  if (isLoading || authLoading) {
+    return <div className="flex items-center justify-center min-h-screen">Loading...</div>;
   }
 
-  const chapterData = await getChapterContent(slug, chapterNumber);
-
   if (!chapterData) {
-     // Provide a link back or to the story page
+     // Handle invalid chapter number or chapter not found
      return (
        <div className="text-center py-20 flex flex-col items-center gap-4">
-         <p className="text-xl text-destructive">Chapter Not Found</p>
-         <p className="text-muted-foreground">We couldn't find the chapter you were looking for.</p>
+         <p className="text-xl text-destructive">
+             {isNaN(chapterNumber) || chapterNumber < 1 ? "Invalid Chapter Number" : "Chapter Not Found"}
+         </p>
+         <p className="text-muted-foreground">
+            {isNaN(chapterNumber) || chapterNumber < 1
+                ? "The chapter number specified in the URL is not valid."
+                : "We couldn't find the chapter you were looking for."
+            }
+          </p>
          <Button variant="outline" asChild>
             <Link href={`/story/${slug}`}>Go to Story Details</Link>
           </Button>
@@ -162,9 +225,8 @@ const ReadingPage: NextPage<ReadPageProps> = async ({ params }) => {
   const progress = Math.round((chapterNumber / totalChapters) * 100);
 
   return (
-    // Using min-h-screen on body ensures footer sticks
-    <div className="flex flex-col">
-       {/* Reading Header - Sticky with background blur */}
+    <div className="flex flex-col min-h-screen"> {/* Ensure full height */}
+       {/* Reading Header - Sticky */}
        <header className="sticky top-0 z-40 w-full border-b bg-background/90 backdrop-blur supports-[backdrop-filter]:bg-background/75 shadow-sm">
          <div className="container flex h-14 items-center justify-between px-4 md:px-6 gap-2">
            {/* Left: Previous Chapter & Story Info Dropdown */}
@@ -182,7 +244,7 @@ const ReadingPage: NextPage<ReadPageProps> = async ({ params }) => {
                          <span className="text-sm font-medium truncate max-w-[150px] sm:max-w-xs md:max-w-sm">{storyTitle}</span>
                          <span className="text-xs text-muted-foreground truncate">{title}</span>
                        </div>
-                        <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" /> {/* Indicate dropdown */}
+                        <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
                     </Button>
                  </DropdownMenuTrigger>
                  <DropdownMenuContent align="start">
@@ -192,11 +254,11 @@ const ReadingPage: NextPage<ReadPageProps> = async ({ params }) => {
                       </Link>
                     </DropdownMenuItem>
                     <DropdownMenuItem asChild>
-                     <Link href={`/story/${slug}#chapters`} className="flex items-center gap-2"> {/* Assuming #chapters target exists */}
+                     <Link href={`/story/${slug}#chapters`} className="flex items-center gap-2">
                         <List className="h-4 w-4" /> Table of Contents
                       </Link>
                     </DropdownMenuItem>
-                    <DropdownMenuItem disabled> {/* Placeholder */}
+                    <DropdownMenuItem disabled>
                       <span className="text-xs text-muted-foreground">By {storyAuthor}</span>
                     </DropdownMenuItem>
                  </DropdownMenuContent>
@@ -205,7 +267,7 @@ const ReadingPage: NextPage<ReadPageProps> = async ({ params }) => {
 
            {/* Right: Actions & Next Chapter */}
            <div className="flex items-center gap-1 md:gap-2">
-              {/* Reading Settings (Placeholder) */}
+             {/* Reading Settings */}
              <DropdownMenu>
                <DropdownMenuTrigger asChild>
                   <Button variant="ghost" size="icon">
@@ -219,19 +281,13 @@ const ReadingPage: NextPage<ReadPageProps> = async ({ params }) => {
                 </DropdownMenuContent>
              </DropdownMenu>
 
-             {/* Comments (Placeholder) */}
-             <Button variant="ghost" size="icon">
-                <MessageSquare className="h-5 w-5" />
-                 <span className="sr-only">Comments</span>
-             </Button>
-
-              {/* Share (Placeholder) */}
-              <Button variant="ghost" size="icon">
+             {/* Share Button */}
+              <Button variant="ghost" size="icon" onClick={handleShare}>
                  <Share2 className="h-5 w-5" />
                   <span className="sr-only">Share</span>
               </Button>
 
-
+             {/* Next Chapter */}
              <Button variant="ghost" size="icon" asChild disabled={!hasNextChapter}>
                 <Link href={hasNextChapter ? `/read/${slug}/${chapterNumber + 1}` : '#'} aria-label="Next Chapter" className={!hasNextChapter ? 'opacity-50 cursor-not-allowed' : 'hover:text-primary'}>
                   <ChevronRight className="h-5 w-5" />
@@ -243,41 +299,127 @@ const ReadingPage: NextPage<ReadPageProps> = async ({ params }) => {
           <Progress value={progress} className="w-full h-1 rounded-none" />
        </header>
 
-       {/* Chapter Content - Centered with max-width */}
+       {/* Chapter Content */}
        <main className="flex-grow container max-w-3xl mx-auto px-4 py-8 md:py-12">
           <article className="prose prose-lg dark:prose-invert max-w-none prose-p:text-foreground/90 prose-strong:text-foreground" style={{fontFamily: "'Georgia', 'Times New Roman', Times, serif", lineHeight: '1.8'}}>
-              {/* Render formatted content */}
               {formatContent(content)}
           </article>
        </main>
 
-       {/* Reading Footer (Pagination) - Simplified */}
-       <footer className="w-full py-4 mt-8">
-          <div className="container flex items-center justify-between px-4 md:px-6">
-             <Button variant="outline" asChild disabled={!hasPreviousChapter}>
-               <Link href={hasPreviousChapter ? `/read/${slug}/${chapterNumber - 1}` : '#'} className={!hasPreviousChapter ? 'opacity-60 cursor-not-allowed' : ''}>
-                  <ChevronLeft className="mr-2 h-4 w-4" /> Previous
-               </Link>
-            </Button>
-            <span className="text-sm text-muted-foreground hidden sm:inline">
-               Chapter {chapterNumber} / {totalChapters}
-            </span>
-            <Button variant="outline" asChild disabled={!hasNextChapter}>
-               <Link href={hasNextChapter ? `/read/${slug}/${chapterNumber + 1}` : '#'} className={!hasNextChapter ? 'opacity-60 cursor-not-allowed' : ''}>
-                  Next <ChevronRight className="ml-2 h-4 w-4" />
-               </Link>
-            </Button>
-          </div>
-       </footer>
+        {/* Interaction Footer (Rating & Comments) */}
+        <footer className="w-full border-t bg-secondary/50 mt-8 py-6">
+            <div className="container max-w-3xl mx-auto px-4 space-y-6">
+                {/* Rating Section */}
+                <div>
+                    <h3 className="text-lg font-semibold mb-2">Rate this chapter</h3>
+                    <div className="flex items-center gap-1">
+                        {[1, 2, 3, 4, 5].map((star) => (
+                            <Button
+                                key={star}
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => handleRate(star)}
+                                disabled={!user} // Disable if not logged in
+                                className={`h-8 w-8 p-0 ${!user ? 'cursor-not-allowed opacity-50' : ''}`}
+                                aria-label={`Rate ${star} stars`}
+                            >
+                                <Star
+                                    className={`h-6 w-6 transition-colors ${
+                                        star <= rating
+                                        ? 'fill-primary text-primary' // Use primary color for selected stars
+                                        : 'text-muted-foreground/50' // Muted for unselected
+                                    } ${user ? 'hover:text-primary/80' : ''}`}
+                                />
+                            </Button>
+                        ))}
+                    </div>
+                    {!user && <p className="text-xs text-muted-foreground mt-1">You must be logged in to rate.</p>}
+                </div>
+
+                <Separator />
+
+                {/* Comments Section */}
+                <div>
+                    <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
+                       <MessageSquare className="w-5 h-5" /> Comments
+                    </h3>
+                    {user ? (
+                        <div className="space-y-4">
+                        {/* Comment Input Area */}
+                        <div className="flex gap-3 items-start">
+                             <Avatar className="mt-1">
+                                <AvatarImage src={user.avatarUrl || undefined} alt={user.name || 'User'} data-ai-hint="user avatar small"/>
+                                <AvatarFallback>{user.name?.substring(0, 1).toUpperCase() || 'U'}</AvatarFallback>
+                            </Avatar>
+                           <div className="flex-1 space-y-2">
+                                <Textarea
+                                    placeholder="Add your comment..."
+                                    value={commentText}
+                                    onChange={(e) => setCommentText(e.target.value)}
+                                    rows={3}
+                                    className="w-full"
+                                />
+                                <Button onClick={handleCommentSubmit} size="sm" disabled={commentText.trim() === ''}>
+                                    <Send className="h-4 w-4 mr-1"/> Post Comment
+                                </Button>
+                           </div>
+                        </div>
+                        {/* Placeholder for existing comments */}
+                        <div className="space-y-4 pt-4">
+                             <p className="text-center text-sm text-muted-foreground italic">No comments yet. Be the first!</p>
+                              {/* Example comment structure (would be mapped from data) */}
+                             {/*
+                             <div className="flex gap-3 items-start">
+                                 <Avatar>...</Avatar>
+                                 <div className="p-3 rounded-md bg-background border w-full">
+                                     <p className="font-semibold text-sm">Another User</p>
+                                     <p className="text-sm text-foreground/80 mt-1">This was a great chapter!</p>
+                                     <p className="text-xs text-muted-foreground mt-2">2 days ago</p>
+                                 </div>
+                             </div>
+                             */}
+                         </div>
+                        </div>
+                    ) : (
+                        <div className="text-center p-6 border border-dashed rounded-md">
+                           <p className="text-muted-foreground">
+                             <Link href="/login" className="text-primary font-medium underline">Log in</Link> or{' '}
+                             <Link href="/signup" className="text-primary font-medium underline">Sign up</Link> to leave a comment.
+                           </p>
+                        </div>
+                    )}
+                </div>
+
+                 {/* Bottom Pagination (Simplified) */}
+                 <Separator className="mt-8"/>
+                 <div className="flex items-center justify-between pt-4">
+                     <Button variant="outline" asChild disabled={!hasPreviousChapter}>
+                       <Link href={hasPreviousChapter ? `/read/${slug}/${chapterNumber - 1}` : '#'} className={!hasPreviousChapter ? 'opacity-60 cursor-not-allowed' : ''}>
+                          <ChevronLeft className="mr-2 h-4 w-4" /> Previous
+                       </Link>
+                    </Button>
+                    <span className="text-sm text-muted-foreground hidden sm:inline">
+                       Chapter {chapterNumber} / {totalChapters}
+                    </span>
+                    <Button variant="outline" asChild disabled={!hasNextChapter}>
+                       <Link href={hasNextChapter ? `/read/${slug}/${chapterNumber + 1}` : '#'} className={!hasNextChapter ? 'opacity-60 cursor-not-allowed' : ''}>
+                          Next <ChevronRight className="ml-2 h-4 w-4" />
+                       </Link>
+                    </Button>
+                  </div>
+            </div>
+        </footer>
     </div>
   );
 };
 
-// Dynamic Metadata Generation
+
+// Keep generateMetadata as is - No client-side hooks allowed here
 export async function generateMetadata({ params }: ReadPageProps) {
   const chapterNumber = parseInt(params.chapter, 10);
   if (isNaN(chapterNumber)) return { title: 'Invalid Chapter | Katha Vault' };
 
+  // Fetch data server-side for metadata
   const chapterData = await getChapterContent(params.slug, chapterNumber);
   if (!chapterData) {
     return { title: 'Chapter Not Found | Katha Vault' };
@@ -288,6 +430,5 @@ export async function generateMetadata({ params }: ReadPageProps) {
   };
 }
 
-export default ReadingPage;
 
-// The dedicated src/app/read/layout.tsx already handles removing the default Header/Footer.
+export default ReadingPage;

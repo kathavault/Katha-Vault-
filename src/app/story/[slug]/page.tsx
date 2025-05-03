@@ -1,3 +1,6 @@
+// src/app/story/[slug]/page.tsx
+'use client'; // Make this a client component to use hooks
+
 import type { NextPage } from 'next';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -6,11 +9,26 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { BookOpen, Eye, Users, MessageSquare, ThumbsUp, List, PlusCircle, Library, CheckCircle } from 'lucide-react';
+import { BookOpen, Eye, Users, MessageSquare, ThumbsUp, List, PlusCircle, Library, CheckCircle, Star, Share2, Send } from 'lucide-react'; // Added/updated icons
 import type { Story } from '@/components/story/story-card'; // Reuse Story type
+import React, { useEffect, useState } from 'react'; // Import React and hooks
+import { useAuth } from '@/hooks/use-auth'; // Import useAuth
+import { Textarea } from '@/components/ui/textarea'; // Import Textarea
+
+// Define extended Story type for this page
+interface StoryDetails extends Story {
+  chaptersData: { id: string; title: string }[];
+  authorFollowers: number;
+  status: 'Ongoing' | 'Completed';
+  lastUpdated: string;
+  // Add optional fields for overall rating, comments etc. if fetched
+  averageRating?: number;
+  totalRatings?: number;
+  comments?: any[]; // Replace 'any' with a proper Comment type later
+}
 
 // Mock data - replace with actual data fetching based on slug
-const getStoryBySlug = async (slug: string): Promise<Story & { chaptersData: { id: string, title: string }[], authorFollowers: number, status: 'Ongoing' | 'Completed', lastUpdated: string } | null> => {
+const getStoryBySlug = async (slug: string): Promise<StoryDetails | null> => {
   console.log("Fetching story for slug:", slug);
   // Simulate API call delay
   await new Promise(resolve => setTimeout(resolve, 50));
@@ -40,15 +58,16 @@ const getStoryBySlug = async (slug: string): Promise<Story & { chaptersData: { i
   // Add mock chapter data and other details
   const chaptersData = Array.from({ length: story.chapters }, (_, i) => ({
     id: `ch-${story.id}-${i + 1}`,
-    // More engaging chapter titles
     title: i === 0 ? `Chapter 1: The Beginning` : `Chapter ${i + 1}: ${['Unexpected Turn', 'Rising Action', 'A New Clue', 'Confrontation', 'Secrets Revealed', 'The Plot Twist'][i % 6]}`,
   }));
   const authorFollowers = Math.floor(Math.random() * 5000) + 50;
   const status = story.chapters > 30 ? 'Ongoing' : 'Completed';
   const lastUpdated = new Date(Date.now() - Math.random() * 30 * 24 * 60 * 60 * 1000).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+  const averageRating = Math.random() * 1.5 + 3.5; // Mock rating between 3.5 and 5
+  const totalRatings = Math.floor(Math.random() * 500) + 10;
 
 
-  return { ...story, chaptersData, authorFollowers, status, lastUpdated };
+  return { ...story, chaptersData, authorFollowers, status, lastUpdated, averageRating, totalRatings, comments: [] }; // Add empty comments array
 };
 
 interface StoryPageProps {
@@ -57,25 +76,87 @@ interface StoryPageProps {
   };
 }
 
-const StoryDetailPage: NextPage<StoryPageProps> = async ({ params }) => {
-  const story = await getStoryBySlug(params.slug);
+const StoryDetailPage: NextPage<StoryPageProps> = ({ params }) => {
+  const { user, isLoading: authLoading } = useAuth(); // Get user state
+  const [story, setStory] = useState<StoryDetails | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [commentText, setCommentText] = useState('');
+  const [rating, setRating] = useState(0); // User's rating for the *overall story*
+  const [isInLibrary, setIsInLibrary] = useState(false); // Placeholder state
+
+
+  // Fetch story data
+  useEffect(() => {
+    const fetchStory = async () => {
+      setIsLoading(true);
+      const data = await getStoryBySlug(params.slug);
+      setStory(data);
+      setIsLoading(false);
+       // TODO: Check if story is in user's library after fetching user/story
+       // setIsInLibrary(checkIfInLibrary(user, data));
+    };
+    fetchStory();
+  }, [params.slug]);
+
+  // Handle comment submission (placeholder)
+  const handleCommentSubmit = () => {
+      if (!user) return;
+      if (commentText.trim() === '') return;
+      console.log(`Submitting comment for story ${story?.title}:`, commentText);
+      // Add actual comment submission logic here (API call)
+      setCommentText('');
+  };
+
+  // Handle overall story rating submission (placeholder)
+   const handleRateStory = (newRating: number) => {
+       if (!user) return;
+       setRating(newRating);
+       console.log(`Submitting overall rating for story ${story?.title}:`, newRating);
+       // Add actual rating submission logic here (API call)
+   };
+
+   // Handle Share (placeholder)
+   const handleShareStory = () => {
+      console.log("Sharing story:", story?.title);
+      // Implement actual sharing logic
+   };
+
+    // Handle Add/Remove from Library (placeholder)
+   const handleToggleLibrary = () => {
+       if (!user) {
+          // Redirect to login or show toast
+           console.log("User must log in to manage library");
+           return;
+       }
+       console.log(isInLibrary ? "Removing from library" : "Adding to library");
+       // Add actual API call here
+       setIsInLibrary(!isInLibrary);
+   };
+
+
+  // Loading state
+  if (isLoading || authLoading) {
+     return <div className="text-center py-20">Loading story details...</div>;
+  }
 
   if (!story) {
-    // In a real app, you'd likely use the notFound() function from next/navigation
+    // Handle story not found
     return <div className="text-center py-20">Story not found.</div>;
   }
 
-  // Placeholder state for "Added to Library"
-  const isInLibrary = false; // Replace with actual logic
+  // Calculate average rating display
+   const displayRating = story.averageRating ? story.averageRating.toFixed(1) : 'N/A';
+   const fullStars = Math.floor(story.averageRating || 0);
+   const hasHalfStar = (story.averageRating || 0) % 1 >= 0.5;
+
 
   return (
-    // Use grid layout with adjusted column spans for different screen sizes
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12">
 
       {/* Left Column (on large screens): Cover, Actions, Details */}
       <div className="lg:col-span-4 xl:col-span-3 space-y-6">
-        {/* Sticky container for cover and actions */}
-        <div className="sticky top-20 space-y-6"> {/* Adjust top offset based on header height */}
+        {/* Sticky container */}
+        <div className="sticky top-20 space-y-6">
           <Card className="overflow-hidden shadow-lg border border-border/80">
             <div className="relative aspect-[2/3] w-full">
               <Image
@@ -84,7 +165,7 @@ const StoryDetailPage: NextPage<StoryPageProps> = async ({ params }) => {
                 fill
                 sizes="(max-width: 1024px) 100vw, 33vw"
                 className="object-cover"
-                priority // Prioritize loading the main story cover
+                priority
                 data-ai-hint={story.dataAiHint || "book cover story detail"}
               />
             </div>
@@ -92,11 +173,17 @@ const StoryDetailPage: NextPage<StoryPageProps> = async ({ params }) => {
 
           <div className="flex flex-col gap-3">
              <Button size="lg" asChild className="w-full bg-primary text-primary-foreground hover:bg-primary/90 text-base font-semibold">
-               <Link href={`/read/${story.slug}/1`}> {/* Link to first chapter */}
+               <Link href={`/read/${story.slug}/1`}>
                  <BookOpen className="mr-2 h-5 w-5" /> Read First Chapter
                </Link>
              </Button>
-             <Button variant={isInLibrary ? "secondary" : "outline"} size="lg" className="w-full text-base font-semibold">
+             <Button
+                variant={isInLibrary ? "secondary" : "outline"}
+                size="lg"
+                className="w-full text-base font-semibold"
+                onClick={handleToggleLibrary}
+                disabled={!user} // Disable if logged out
+             >
                {isInLibrary ? (
                   <>
                     <CheckCircle className="mr-2 h-5 w-5 text-green-600" /> In Your Library
@@ -106,28 +193,40 @@ const StoryDetailPage: NextPage<StoryPageProps> = async ({ params }) => {
                     <PlusCircle className="mr-2 h-5 w-5" /> Add to Library
                   </>
                 )}
+                 {!user && <span className="text-xs ml-2">(Log in)</span>}
              </Button>
           </div>
 
           {/* Story Stats Card */}
           <Card className="border border-border/80">
             <CardContent className="p-4 space-y-3 text-sm">
-              <div className="flex items-center justify-between">
-                <span className="text-muted-foreground font-medium flex items-center gap-2"><Eye className="w-4 h-4" /> Reads</span>
-                <span className="font-bold">{story.reads.toLocaleString()}</span>
-              </div>
-              <Separator />
+               {/* Reads, Votes, Parts */}
                <div className="flex items-center justify-between">
-                 <span className="text-muted-foreground font-medium flex items-center gap-2"><ThumbsUp className="w-4 h-4" /> Votes</span>
-                 <span className="font-bold">{(story.reads / 10).toLocaleString(undefined, {maximumFractionDigits: 0})}</span> {/* Mock votes */}
+                   <span className="text-muted-foreground font-medium flex items-center gap-2"><Eye className="w-4 h-4" /> Reads</span>
+                   <span className="font-bold">{story.reads.toLocaleString()}</span>
                </div>
-                <Separator />
+               <Separator />
+               <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground font-medium flex items-center gap-2"><ThumbsUp className="w-4 h-4" /> Votes</span>
+                  <span className="font-bold">{(story.reads / 10).toLocaleString(undefined, {maximumFractionDigits: 0})}</span>
+                </div>
+               <Separator />
+               <div className="flex items-center justify-between">
+                   <span className="text-muted-foreground font-medium flex items-center gap-2"><List className="w-4 h-4" /> Parts</span>
+                   <span className="font-bold">{story.chapters}</span>
+               </div>
+               <Separator />
+                {/* Rating */}
                 <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground font-medium flex items-center gap-2"><List className="w-4 h-4" /> Parts</span>
-                  <span className="font-bold">{story.chapters}</span>
+                    <span className="text-muted-foreground font-medium flex items-center gap-2"><Star className="w-4 h-4" /> Rating</span>
+                    <div className="flex items-center gap-1">
+                        <span className="font-bold">{displayRating}</span>
+                        <span className="text-xs text-muted-foreground">({story.totalRatings})</span>
+                    </div>
                 </div>
                 <Separator />
-                <div className="flex items-center justify-between">
+                {/* Status & Updated */}
+                 <div className="flex items-center justify-between">
                    <span className="text-muted-foreground font-medium">Status</span>
                     <Badge variant={story.status === 'Completed' ? "secondary" : "outline"} className={story.status === 'Completed' ? "text-green-700 border-green-300 bg-green-50" : "text-blue-700 border-blue-300 bg-blue-50"}>
                      {story.status}
@@ -150,7 +249,6 @@ const StoryDetailPage: NextPage<StoryPageProps> = async ({ params }) => {
                 <CardContent className="p-4 pt-0">
                     <div className="flex flex-wrap gap-2">
                       {story.tags.map(tag => (
-                        // Make tags links to browse page with tag filter
                         <Link key={tag} href={`/browse?tags=${encodeURIComponent(tag)}`}>
                           <Badge variant="secondary" className="cursor-pointer hover:bg-accent hover:text-accent-foreground transition-colors">
                             #{tag.toLowerCase()}
@@ -161,32 +259,63 @@ const StoryDetailPage: NextPage<StoryPageProps> = async ({ params }) => {
                 </CardContent>
              </Card>
           )}
+           {/* Share Button */}
+           <Button variant="outline" className="w-full" onClick={handleShareStory}>
+              <Share2 className="mr-2 h-4 w-4" /> Share Story
+           </Button>
         </div>
       </div>
 
 
-      {/* Right Column (on large screens): Title, Author, Desc, Chapters, Comments */}
+      {/* Right Column: Title, Author, Desc, Chapters, Comments */}
       <div className="lg:col-span-8 xl:col-span-9 space-y-8">
-        {/* Story Title and Author */}
+        {/* Title, Author, Rating */}
         <div className="space-y-3">
           <h1 className="text-3xl md:text-4xl font-bold leading-tight text-foreground">{story.title}</h1>
-          <div className="flex items-center gap-3">
-            <Link href={`/user/${story.author.toLowerCase().replace(/\s+/g, '-')}`} className="flex items-center gap-3 group">
-              <Avatar className="h-11 w-11 border-2 border-border group-hover:border-primary transition-colors">
-                <AvatarImage src={`https://picsum.photos/seed/${story.author}/100/100`} alt={story.author} data-ai-hint="author profile picture large" />
-                <AvatarFallback>{story.author.substring(0, 1).toUpperCase()}</AvatarFallback>
-              </Avatar>
-              <div>
-                 <p className="font-semibold text-lg group-hover:text-primary transition-colors">{story.author}</p>
-                 <p className="text-sm text-muted-foreground">{story.authorFollowers.toLocaleString()} Followers</p>
-              </div>
-            </Link>
-             <Button variant="outline" size="sm" className="ml-4">Follow</Button>
-          </div>
+           {/* Author Info */}
+           <div className="flex items-center gap-3">
+              <Link href={`/user/${story.author.toLowerCase().replace(/\s+/g, '-')}`} className="flex items-center gap-3 group">
+                <Avatar className="h-11 w-11 border-2 border-border group-hover:border-primary transition-colors">
+                  <AvatarImage src={`https://picsum.photos/seed/${story.author}/100/100`} alt={story.author} data-ai-hint="author profile picture large" />
+                  <AvatarFallback>{story.author.substring(0, 1).toUpperCase()}</AvatarFallback>
+                </Avatar>
+                <div>
+                   <p className="font-semibold text-lg group-hover:text-primary transition-colors">{story.author}</p>
+                   <p className="text-sm text-muted-foreground">{story.authorFollowers.toLocaleString()} Followers</p>
+                </div>
+              </Link>
+              {/* Follow Button Placeholder */}
+               {user && user.email !== story.author && ( // Don't show follow for self
+                  <Button variant="outline" size="sm" className="ml-4">Follow</Button>
+               )}
+           </div>
+            {/* Overall Story Rating Input */}
+            <div className="flex items-center gap-2 pt-2">
+                 <span className="text-sm font-medium text-muted-foreground">Your Rating:</span>
+                 {[1, 2, 3, 4, 5].map((star) => (
+                     <Button
+                         key={star}
+                         variant="ghost"
+                         size="icon"
+                         onClick={() => handleRateStory(star)}
+                         disabled={!user}
+                         className={`h-7 w-7 p-0 ${!user ? 'cursor-not-allowed opacity-50' : ''}`}
+                         aria-label={`Rate story ${star} stars`}
+                     >
+                         <Star
+                             className={`h-5 w-5 transition-colors ${
+                                 star <= rating
+                                 ? 'fill-primary text-primary'
+                                 : 'text-muted-foreground/50'
+                             } ${user ? 'hover:text-primary/80' : ''}`}
+                         />
+                     </Button>
+                 ))}
+                 {!user && <Link href="/login" className="text-xs text-primary underline ml-1">Log in to rate</Link>}
+            </div>
         </div>
 
         {/* Story Description */}
-        {/* Using Card for subtle bordering */}
         <Card className="border border-border/80 shadow-sm">
            <CardContent className="p-5">
              <p className="text-base md:text-lg leading-relaxed whitespace-pre-line text-foreground/90">{story.description}</p>
@@ -195,22 +324,19 @@ const StoryDetailPage: NextPage<StoryPageProps> = async ({ params }) => {
 
 
         {/* Table of Contents */}
-        <Card id="chapters" className="border border-border/80 shadow-sm scroll-mt-20"> {/* Add scroll margin */}
+        <Card id="chapters" className="border border-border/80 shadow-sm scroll-mt-20">
           <CardHeader className="border-b border-border/80">
             <CardTitle className="flex items-center gap-2 text-xl font-semibold">
                <List className="w-5 h-5" /> Table of Contents ({story.chapters} Parts)
             </CardTitle>
           </CardHeader>
-          <CardContent className="p-0"> {/* Remove padding to let links fill space */}
+          <CardContent className="p-0">
              <ul className="divide-y divide-border/60">
                {story.chaptersData.map((chapter, index) => (
                   <li key={chapter.id}>
                      <Link href={`/read/${story.slug}/${index + 1}`} className="flex justify-between items-center p-4 hover:bg-secondary transition-colors duration-150 group">
                        <span className="font-medium group-hover:text-primary">{chapter.title}</span>
-                       <span className="text-sm text-muted-foreground">
-                          {/* Placeholder for chapter read time or date */}
-                          {/* Example: 5 min read */}
-                       </span>
+                       <span className="text-sm text-muted-foreground"></span>
                      </Link>
                   </li>
                ))}
@@ -218,28 +344,46 @@ const StoryDetailPage: NextPage<StoryPageProps> = async ({ params }) => {
           </CardContent>
         </Card>
 
-         {/* Comments Section Placeholder */}
+         {/* Comments Section */}
          <Card className="border border-border/80 shadow-sm">
              <CardHeader className="border-b border-border/80">
                 <CardTitle className="flex items-center gap-2 text-xl font-semibold">
                   <MessageSquare className="w-5 h-5" /> Comments
                 </CardTitle>
              </CardHeader>
-             <CardContent className="p-5">
-                 <p className="text-muted-foreground mb-4">Join the conversation!</p>
-                 {/* Add comment input (e.g., Textarea + Button) */}
+             <CardContent className="p-5 space-y-6">
+                 {user ? (
+                     <div className="flex gap-3 items-start">
+                         <Avatar className="mt-1">
+                           <AvatarImage src={user.avatarUrl || undefined} alt={user.name || 'User'} data-ai-hint="user avatar comment"/>
+                           <AvatarFallback>{user.name?.substring(0, 1).toUpperCase() || 'U'}</AvatarFallback>
+                          </Avatar>
+                         <div className="flex-1 space-y-2">
+                             <Textarea
+                                 placeholder="Add a comment about the story..."
+                                 value={commentText}
+                                 onChange={(e) => setCommentText(e.target.value)}
+                                 rows={3}
+                                 className="w-full"
+                             />
+                             <Button onClick={handleCommentSubmit} size="sm" disabled={commentText.trim() === ''}>
+                               <Send className="h-4 w-4 mr-1" /> Post Comment
+                             </Button>
+                         </div>
+                     </div>
+                 ) : (
+                     <div className="text-center p-4 border border-dashed rounded-md">
+                         <p className="text-muted-foreground">
+                            <Link href="/login" className="text-primary font-medium underline">Log in</Link> or{' '}
+                            <Link href="/signup" className="text-primary font-medium underline">Sign up</Link> to leave a comment.
+                         </p>
+                     </div>
+                 )}
+
                  {/* Display existing comments */}
-                 <div className="space-y-4 mt-4">
-                    <p className="text-center text-sm text-muted-foreground italic">Comment feature coming soon.</p>
-                    {/* Example comment structure */}
-                    {/* <div className="flex gap-3">
-                      <Avatar>...</Avatar>
-                      <div>
-                        <p className="font-semibold">Commenter Name</p>
-                        <p className="text-sm text-foreground/80">This is a great chapter!</p>
-                        <p className="text-xs text-muted-foreground mt-1">2 days ago</p>
-                      </div>
-                    </div> */}
+                 <div className="space-y-4 pt-4">
+                    <p className="text-center text-sm text-muted-foreground italic">Story comments coming soon.</p>
+                    {/* Map through actual story.comments array here */}
                  </div>
              </CardContent>
          </Card>
@@ -248,7 +392,7 @@ const StoryDetailPage: NextPage<StoryPageProps> = async ({ params }) => {
   );
 };
 
-// Metadata generation (optional but good practice)
+// Metadata generation remains server-side
 export async function generateMetadata({ params }: StoryPageProps) {
   const story = await getStoryBySlug(params.slug);
   if (!story) {
@@ -257,7 +401,6 @@ export async function generateMetadata({ params }: StoryPageProps) {
   return {
     title: `${story.title} by ${story.author} | Katha Vault`,
     description: story.description.substring(0, 160), // Truncate description for SEO
-    // Add OpenGraph metadata if desired
      openGraph: {
        title: `${story.title} by ${story.author} | Katha Vault`,
        description: story.description.substring(0, 160),
@@ -269,19 +412,10 @@ export async function generateMetadata({ params }: StoryPageProps) {
            alt: `Cover for ${story.title}`,
          },
        ],
-       type: 'article', // Or 'book' if more appropriate schema exists
-       // url: `your-site-url/story/${story.slug}` // Add actual URL
+       type: 'article',
      },
   };
 }
 
 
 export default StoryDetailPage;
-
-// Optional: Generate static paths if you know all story slugs beforehand
-// export async function generateStaticParams() {
-//   // Fetch all story slugs
-//   // const stories = await getAllStorySlugs(); // Implement this function
-//   // const slugs = mockStories.map(story => ({ slug: story.slug })); // Use mock data for now
-//   // return slugs;
-// }
