@@ -3,7 +3,7 @@
 
 import * as React from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation'; // Import useSearchParams
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import * as z from 'zod';
@@ -23,6 +23,7 @@ import { useAuth } from '@/hooks/use-auth'; // Use the updated hook
 import { LogIn, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Separator } from '@/components/ui/separator'; // Import Separator
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"; // Import Alert
 
 // Social Icons (simple SVGs for example)
 const GoogleIcon = () => (
@@ -32,7 +33,6 @@ const FacebookIcon = () => (
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 50 50" width="20px" height="20px"><path fill="#3b5998" d="M25,3C12.85,3,3,12.85,3,25c0,11.03,8.125,20.137,18.712,21.728V30.831h-5.443v-5.783h5.443v-4.211c0-5.387,3.158-8.348,8.107-8.348c2.336,0,4.74,0.408,4.74,0.408v5.019h-2.798c-2.688,0-3.524,1.678-3.524,3.465v3.667h6.23L34.89,30.83h-6.23v15.899C38.875,45.137,47,36.03,47,25C47,12.85,37.15,3,25,3z"/></svg>
 );
 
-
 const formSchema = z.object({
   email: z.string().email({ message: 'Please enter a valid email address.' }),
   password: z.string().min(1, { message: 'Password is required.' }),
@@ -40,10 +40,67 @@ const formSchema = z.object({
 
 type LoginFormValues = z.infer<typeof formSchema>;
 
+// Helper component to handle email verification logic from URL params
+const EmailVerificationHandler = () => {
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const { handleVerifyEmail, isLoading } = useAuth();
+  const { toast } = useToast();
+  const [verificationStatus, setVerificationStatus] = React.useState<'pending' | 'success' | 'error' | null>(null);
+
+  React.useEffect(() => {
+    const mode = searchParams.get('mode');
+    const actionCode = searchParams.get('oobCode');
+
+    if (mode === 'verifyEmail' && actionCode) {
+      setVerificationStatus('pending');
+      handleVerifyEmail(actionCode).then((success) => {
+        setVerificationStatus(success ? 'success' : 'error');
+        // Clean the URL parameters after handling verification
+        router.replace('/login', undefined); // Use undefined instead of { shallow: true } for Next 14+ App Router
+      });
+    }
+  }, [searchParams, handleVerifyEmail, router]);
+
+  if (isLoading || verificationStatus === 'pending') {
+    return (
+      <div className="flex items-center justify-center py-4">
+        <Loader2 className="h-6 w-6 animate-spin text-primary" />
+        <span className="ml-2">Verifying email...</span>
+      </div>
+    );
+  }
+
+  if (verificationStatus === 'success') {
+    return (
+       <Alert variant="default" className="mb-4 bg-green-50 border-green-200">
+         <AlertTitle className="text-green-800">Email Verified!</AlertTitle>
+         <AlertDescription className="text-green-700">
+           Your email has been successfully verified. Please log in.
+         </AlertDescription>
+       </Alert>
+     );
+  }
+
+  if (verificationStatus === 'error') {
+     return (
+       <Alert variant="destructive" className="mb-4">
+         <AlertTitle>Verification Failed</AlertTitle>
+         <AlertDescription>
+           The verification link is invalid or has expired. Please try signing up again or contact support.
+         </AlertDescription>
+       </Alert>
+     );
+  }
+
+  return null; // No verification happening
+};
+
+
 export default function LoginPage() {
   const router = useRouter();
   // Use the updated auth hook
-  const { loginWithEmail, loginWithGoogle, loginWithFacebook, isLoading, isAdmin, isVerifyingAdminOtp } = useAuth();
+  const { loginWithEmail, loginWithGoogle, loginWithFacebook, isLoading, isAdmin, isVerifyingAdminOtp, user } = useAuth();
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = React.useState(false);
 
@@ -55,54 +112,52 @@ export default function LoginPage() {
     },
   });
 
+   // Redirect if already logged in (and not needing admin OTP)
+   React.useEffect(() => {
+       if (!isLoading && user && !isVerifyingAdminOtp) {
+           router.replace(isAdmin ? '/admin' : '/'); // Redirect logged-in users appropriately
+       }
+   }, [user, isAdmin, isLoading, isVerifyingAdminOtp, router]);
+
   // Handle Email/Password Login
   const onEmailSubmit = async (values: LoginFormValues) => {
     setIsSubmitting(true);
+    // loginWithEmail now handles email verification check internally
     const loggedInUser = await loginWithEmail(values.email, values.password);
     setIsSubmitting(false); // Set submitting false after attempt
 
     if (loggedInUser) {
-      // Check if admin needs OTP verification
-      if (loggedInUser.email === ADMIN_EMAIL) {
-         // The useAuth hook now sets isAdmin and isVerifyingAdminOtp
-         // We rely on the hook's state to trigger the redirect logic below
-         // toast is now handled within the hook for admin OTP flow start
-      } else {
-        toast({ title: "Login Successful", description: "Welcome back!" });
-        router.push('/'); // Redirect regular users to homepage
-      }
+      // Redirect logic is now handled by the useEffect hooks below
     }
-    // Error toast is handled within the loginWithEmail function
+    // Error/verification toasts are handled within loginWithEmail
   };
 
  // Redirect admin to OTP page if login was successful and OTP is required
   React.useEffect(() => {
-    if (isAdmin && isVerifyingAdminOtp) {
+    // Check specifically for the admin user needing OTP verification
+    if (!isLoading && isAdmin && isVerifyingAdminOtp && user?.email === ADMIN_EMAIL) {
        toast({
-           title: "Admin Login",
+           title: "Admin Login Step 2",
            description: "Please enter the OTPs sent to your phone and email.",
         });
       router.push('/login/otp');
     }
-  }, [isAdmin, isVerifyingAdminOtp, router, toast]);
+  }, [isAdmin, isVerifyingAdminOtp, router, toast, isLoading, user]);
 
   // Handle Google Login
   const handleGoogleLogin = async () => {
-    const user = await loginWithGoogle();
-    if (user) {
-      // Redirect to homepage after successful Google login
-      // Admin check is handled by onAuthStateChanged in the hook
-      router.push('/');
+    const loggedInUser = await loginWithGoogle();
+    if (loggedInUser) {
+      // Redirect logic handled by useEffect above
     }
     // Error toasts handled in the hook
   };
 
   // Handle Facebook Login
   const handleFacebookLogin = async () => {
-     const user = await loginWithFacebook();
-     if (user) {
-       // Redirect to homepage after successful Facebook login
-       router.push('/');
+     const loggedInUser = await loginWithFacebook();
+     if (loggedInUser) {
+       // Redirect logic handled by useEffect above
      }
      // Error toasts handled in the hook
   };
@@ -118,6 +173,11 @@ export default function LoginPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
+           {/* Email Verification Handler */}
+           <React.Suspense fallback={<div>Loading verification status...</div>}>
+             <EmailVerificationHandler />
+           </React.Suspense>
+
            {/* Social Logins */}
             <div className="flex flex-col sm:flex-row gap-3 mb-6">
                 <Button variant="outline" className="w-full flex-1" onClick={handleGoogleLogin} disabled={isLoading || isSubmitting}>
@@ -133,7 +193,7 @@ export default function LoginPage() {
                     <span className="w-full border-t" />
                 </div>
                 <div className="relative flex justify-center text-xs uppercase">
-                    <span className="bg-background px-2 text-muted-foreground">
+                    <span className="bg-card px-2 text-muted-foreground">
                     Or continue with
                     </span>
                 </div>
@@ -164,6 +224,12 @@ export default function LoginPage() {
                     <FormControl>
                       <Input type="password" placeholder="••••••••" {...field} />
                     </FormControl>
+                     <div className="text-right text-sm">
+                         <Link href="/forgot-password" // Add a link to a future forgot password page
+                               className="font-medium text-primary hover:underline">
+                             Forgot password?
+                         </Link>
+                     </div>
                     <FormMessage />
                   </FormItem>
                 )}

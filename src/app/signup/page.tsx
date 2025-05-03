@@ -45,7 +45,7 @@ type SignupFormValues = z.infer<typeof formSchema>;
 
 export default function SignupPage() {
   const router = useRouter();
-  const { signupWithEmail, loginWithGoogle, loginWithFacebook, isLoading } = useAuth(); // Get functions from hook
+  const { signupWithEmail, loginWithGoogle, loginWithFacebook, isLoading, user } = useAuth(); // Get functions from hook
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = React.useState(false);
 
@@ -58,35 +58,41 @@ export default function SignupPage() {
     },
   });
 
+  // Redirect if already logged in
+  React.useEffect(() => {
+      if (!isLoading && user) {
+          router.replace('/'); // Redirect logged-in users to homepage
+      }
+  }, [user, isLoading, router]);
+
   // Handle Email/Password Signup
   const onEmailSubmit = async (values: SignupFormValues) => {
     setIsSubmitting(true);
-    const user = await signupWithEmail(values.email, values.password);
+    // signupWithEmail now sends verification email and signs user out
+    const signupAttempt = await signupWithEmail(values.email, values.password);
     setIsSubmitting(false);
 
-    if (user) {
-      // Signup successful toast is handled in the hook
-      router.push('/login'); // Redirect to login after successful signup
+    if (signupAttempt === null) { // Check for null explicitly, indicates success (but needs verification)
+      // Toast is handled in the hook
+      router.push('/login'); // Redirect to login page to wait for verification
     }
     // Error toasts handled in the hook
   };
 
   // Handle Google Signup/Login
   const handleGoogleSignup = async () => {
-    const user = await loginWithGoogle();
-    if (user) {
-       // Redirect to homepage after successful Google signup/login
-      router.push('/');
+    const loggedInUser = await loginWithGoogle();
+    if (loggedInUser) {
+       // Redirect logic handled by useEffect above
     }
      // Error toasts handled in the hook
   };
 
  // Handle Facebook Signup/Login
  const handleFacebookSignup = async () => {
-     const user = await loginWithFacebook();
-     if (user) {
-        // Redirect to homepage after successful Facebook signup/login
-       router.push('/');
+     const loggedInUser = await loginWithFacebook();
+     if (loggedInUser) {
+        // Redirect logic handled by useEffect above
      }
       // Error toasts handled in the hook
  };
@@ -98,7 +104,7 @@ export default function SignupPage() {
         <CardHeader className="text-center space-y-1">
           <CardTitle className="text-2xl font-bold">Create Account</CardTitle>
           <CardDescription>
-            Join Katha Vault today!
+            Join Katha Vault today! A verification email will be sent.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -117,7 +123,7 @@ export default function SignupPage() {
                     <span className="w-full border-t" />
                 </div>
                 <div className="relative flex justify-center text-xs uppercase">
-                    <span className="bg-background px-2 text-muted-foreground">
+                    <span className="bg-card px-2 text-muted-foreground">
                     Or sign up with email
                     </span>
                 </div>
@@ -146,7 +152,7 @@ export default function SignupPage() {
                   <FormItem>
                     <FormLabel>Password</FormLabel>
                     <FormControl>
-                      <Input type="password" placeholder="••••••••" {...field} />
+                      <Input type="password" placeholder="•••••••• (min. 8 characters)" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
