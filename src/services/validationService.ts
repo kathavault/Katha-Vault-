@@ -1,6 +1,4 @@
 // src/services/validationService.ts
-'use server';
-
 /**
  * @fileOverview Provides basic server-side validation functions.
  */
