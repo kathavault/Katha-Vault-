@@ -14,7 +14,6 @@ import {
   writeBatch,
   Timestamp,
   serverTimestamp,
-  DocumentData,
 } from 'firebase/firestore';
 import type { Story, Chapter } from '@/types'; // Import shared types
 
@@ -194,34 +193,6 @@ export const deleteChapter = async (storyId: string, chapterId: string): Promise
     console.error(`Error deleting chapter ${chapterId} from story ${storyId}:`, error);
     throw new Error("Failed to delete chapter.");
   }
-};
-
-async function fetchStoryBySlug(slug: string): Promise<Story | null> {
-  const storiesRef = collection(db, "stories");
-  const q = query(storiesRef, where("slug", "==", slug));
-  const querySnapshot = await getDocs(q);
-  if (!querySnapshot.empty) {
-      const storyDoc = querySnapshot.docs[0];
-      const storyData = storyDoc.data();
-      // Fetch chapters separately
-      const chaptersRef = collection(db, "stories", storyDoc.id, "chapters");
-      const chaptersQuery = query(chaptersRef, orderBy("order", "asc"));
-      const chaptersSnapshot = await getDocs(chaptersQuery);
-      const chapters: Chapter[] = chaptersSnapshot.docs.map(chapterDoc => ({
-          id: chapterDoc.id,
-          ...chapterDoc.data() as Omit<Chapter, "id">,
-      }));
-      return {
-          id: storyDoc.id,
-          ...storyData as Omit<Story, "id">,
-          chapters,
-      } as Story;
-  }
-  return null;
-}
-
-export {
-  fetchStoryBySlug,
 };
 
 // Add functions for fetching/updating user data, site settings etc. as needed
