@@ -39,6 +39,42 @@ interface Story {
   status: 'Draft' | 'Published' | 'Archived';
 }
 
+// Validation function for story data
+const validateStoryData = (data: { title: string; description: string; genre: string }): string | null => {
+    if (!data.title || data.title.trim().length === 0) {
+        return "Story title cannot be empty.";
+    }
+    if (data.title.length > 100) { // Example max length
+        return "Story title cannot exceed 100 characters.";
+    }
+    if (!data.genre) {
+        return "Please select a genre for the story.";
+    }
+    if (!data.description || data.description.trim().length === 0) {
+        return "Story description cannot be empty.";
+    }
+    if (data.description.length > 1000) { // Example max length
+        return "Story description cannot exceed 1000 characters.";
+    }
+    // Add more validation rules as needed (e.g., for tags)
+    return null; // No validation errors
+};
+
+// Validation function for chapter data
+const validateChapterData = (data: { title: string; content: string }): string | null => {
+    if (!data.title || data.title.trim().length === 0) {
+        return "Chapter title cannot be empty.";
+    }
+    if (data.title.length > 150) { // Example max length
+        return "Chapter title cannot exceed 150 characters.";
+    }
+    if (!data.content || data.content.trim().length === 0) {
+        return "Chapter content cannot be empty.";
+    }
+    // Add more validation rules as needed
+    return null; // No validation errors
+};
+
 // Mock stories for the editor (replace with data fetched for the admin)
 const mockAdminStories: Story[] = [
   {
@@ -177,10 +213,13 @@ export default function AdminWritePage() {
   };
 
   const handleSaveStory = () => {
-       if (!storyTitle) {
-           toast({ title: "Story title cannot be empty", variant: "destructive" });
+       // Validate story data
+       const validationError = validateStoryData({ title: storyTitle, description: storyDescription, genre: storyGenre });
+       if (validationError) {
+           toast({ title: "Validation Error", description: validationError, variant: "destructive" });
            return;
        }
+
         // Simulate saving
         console.log("Saving story:", { title: storyTitle, description: storyDescription, genre: storyGenre, tags: storyTags.split(',').map(t => t.trim()) });
         toast({ title: "Story Saved (Simulated)", description: `Story "${storyTitle}" has been saved.` });
@@ -216,8 +255,11 @@ export default function AdminWritePage() {
       toast({ title: "No story selected", variant: "destructive" });
       return;
     }
-    if (!chapterTitle) {
-        toast({ title: "Chapter title cannot be empty", variant: "destructive"});
+
+    // Validate chapter data
+    const validationError = validateChapterData({ title: chapterTitle, content: chapterContent });
+    if (validationError) {
+        toast({ title: "Validation Error", description: validationError, variant: "destructive" });
         return;
     }
 
@@ -503,3 +545,6 @@ export default function AdminWritePage() {
     </div>
   );
 }
+
+
+    
