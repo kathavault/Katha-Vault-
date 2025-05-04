@@ -15,12 +15,14 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
+  FormDescription, // Import FormDescription
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAuth } from '@/hooks/use-auth'; // Use the updated auth hook
 import { ShieldCheck, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"; // Import Alert
 
 // Define the OTP form schema
 const otpFormSchema = z.object({
@@ -66,6 +68,7 @@ export default function OtpVerificationPage() {
     setIsVerifyingLocally(true);
     try {
       // Use the verifyAdminOtp function from the hook
+      // WARNING: This is a simulated OTP verification. Not secure for production.
       const isVerified = await verifyAdminOtp(values.phoneOtp, values.emailOtp);
 
       if (isVerified) {
@@ -100,9 +103,16 @@ export default function OtpVerificationPage() {
       <Card className="w-full max-w-md mx-auto shadow-lg">
         <CardHeader className="text-center space-y-1">
           <CardTitle className="text-2xl font-bold">Admin OTP Verification</CardTitle>
-          <CardDescription>
-            Enter the codes sent to your registered phone number (*** *** 5653) and email addresses.
-          </CardDescription>
+           <CardDescription>
+              {/* Security Warning */}
+               <Alert variant="warning" className="mb-4 text-left">
+                   <AlertTitle>Security Simulation</AlertTitle>
+                   <AlertDescription>
+                       This OTP verification is a simulation for demonstration purposes only and is **not secure**. A real application requires a proper backend OTP system.
+                   </AlertDescription>
+               </Alert>
+               Enter the codes sent to your registered phone number (*** *** 5653) and email addresses.
+           </CardDescription>
         </CardHeader>
         <CardContent>
           <Form {...form}>
@@ -112,7 +122,8 @@ export default function OtpVerificationPage() {
                 name="phoneOtp"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Phone OTP (9756745653)</FormLabel>
+                    <FormLabel>Phone OTP</FormLabel>
+                     <FormDescription>Check number ending in 5653. (Simulated OTP: 123456)</FormDescription>
                     <FormControl>
                       <Input placeholder="123456" {...field} maxLength={6} inputMode="numeric" />
                     </FormControl>
@@ -126,7 +137,7 @@ export default function OtpVerificationPage() {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Email OTP</FormLabel>
-                     <FormDescription>Check superworth00@gmail.com or rajputkritika87555@gmail.com</FormDescription>
+                     <FormDescription>Check superworth00@gmail.com or rajputkritika87555@gmail.com. (Simulated OTP: 654321)</FormDescription>
                     <FormControl>
                       <Input placeholder="654321" {...field} maxLength={6} inputMode="numeric" />
                     </FormControl>

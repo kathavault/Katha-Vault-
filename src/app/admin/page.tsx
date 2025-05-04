@@ -56,6 +56,18 @@ export default function AdminDashboardPage() {
         Welcome, Admin ({user.email}). Manage Katha Vault content and settings here.
       </p>
 
+       {/* Important Security Note */}
+       <Card className="mt-8 border-destructive bg-destructive/10">
+           <CardHeader>
+               <CardTitle className="text-destructive">Security Notice</CardTitle>
+           </CardHeader>
+           <CardContent className="text-destructive/90 space-y-2">
+               <p>This is a **simulated** admin panel.</p>
+               <p>The login process (including OTP) and access control are **not secure** and rely on insecure methods (e.g., hardcoded email check, simulated OTP).</p>
+                <p><strong>Do not use this implementation in a production environment without proper backend security, authentication (e.g., Firebase custom claims for roles), and authorization checks on the server-side for every action.</strong></p>
+           </CardContent>
+       </Card>
+
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {/* Placeholder Cards for Admin Actions */}
         <Card>
@@ -104,15 +116,7 @@ export default function AdminDashboardPage() {
              </CardContent>
          </Card>
       </div>
-       {/* Important Security Note */}
-        <Card className="mt-8 border-destructive bg-destructive/10">
-            <CardHeader>
-                <CardTitle className="text-destructive">Security Notice</CardTitle>
-            </CardHeader>
-            <CardContent className="text-destructive/90">
-                This is a **simulated** admin panel. The login process and access control are **not secure**. Do not use this implementation in a production environment without proper backend security, authentication, and authorization.
-            </CardContent>
-        </Card>
+
     </div>
   );
 }

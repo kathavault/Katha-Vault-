@@ -1,4 +1,3 @@
-// src/hooks/use-auth.ts
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
@@ -19,7 +18,7 @@ import { auth } from '@/lib/firebase'; // Import auth from firebase setup
 import { useToast } from './use-toast'; // Import useToast
 
 // Define the user type structure we'll use in the app
-interface User {
+export interface User {
   id: string;
   email: string | null;
   name?: string | null;
@@ -28,7 +27,8 @@ interface User {
 }
 
 // Define the simulated admin email
-const ADMIN_EMAIL = "kathavault@gmail.com";
+// WARNING: Hardcoding admin email is NOT secure for production. Use roles/custom claims.
+export const ADMIN_EMAIL = "kathavault@gmail.com";
 
 // Define the hook
 export function useAuth() {
@@ -51,11 +51,14 @@ export function useAuth() {
           emailVerified: firebaseUser.emailVerified, // Get verification status
         };
         setUser(appUser);
+        // WARNING: Checking email directly for admin role is NOT secure for production.
+        // Use Firebase custom claims or a dedicated role management system.
         const isAdminUser = appUser.email === ADMIN_EMAIL;
         setIsAdmin(isAdminUser);
         // If admin logs in, don't immediately assume full access, wait for OTP step
         // Also ensure non-admins don't get stuck in OTP state
-        setIsVerifyingAdminOtp(isAdminUser && !appUser.emailVerified); // Simplified: Admin OTP tied to email verification for now
+        // WARNING: Tying admin OTP to email verification status is a placeholder, NOT a secure OTP mechanism.
+        setIsVerifyingAdminOtp(isAdminUser && !appUser.emailVerified);
       } else {
         // User is signed out
         setUser(null);
@@ -131,11 +134,14 @@ export function useAuth() {
       }
 
       // Don't set user state here, onAuthStateChanged handles it
+      // WARNING: Checking email directly for admin role is NOT secure for production.
+      // Use Firebase custom claims or a dedicated role management system.
       const isAdminUser = firebaseUser.email === ADMIN_EMAIL;
       setIsAdmin(isAdminUser); // Set admin status immediately for conditional logic
 
       if (isAdminUser) {
         // Admin flow: Requires OTP after password login
+        // WARNING: This OTP flow is simulated and NOT secure for production.
         setIsVerifyingAdminOtp(true);
         // Redirect handled in LoginPage based on isAdmin and isVerifyingAdminOtp
       } else {
@@ -261,6 +267,9 @@ export function useAuth() {
   };
 
   // Simulate OTP verification (only checks if admin email was used initially)
+  // WARNING: THIS IS A SIMULATION AND NOT SECURE FOR PRODUCTION.
+  // A real OTP system requires a backend to generate, send (via SMS/Email), and verify codes securely.
+  // Do NOT use this implementation in a real application.
   const verifyAdminOtp = useCallback(async (phoneOtp: string, emailOtp: string): Promise<boolean> => {
     if (!user || !isAdmin) {
       toast({ title: "Error", description: "Admin user not properly logged in.", variant: "destructive" });
@@ -349,3 +358,4 @@ export function useAuth() {
 // NOTE: A real OTP system requires a backend to generate/send/verify codes.
 // The current 'verifyAdminOtp' is a placeholder simulation.
 // Email verification flow is added, users need to click the link in their email.
+// WARNING: Checking email for admin role is insecure. Use custom claims or a backend role system.
