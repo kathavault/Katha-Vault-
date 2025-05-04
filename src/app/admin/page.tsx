@@ -4,7 +4,7 @@
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/use-auth';
-import { Loader2, ShieldCheck, LogOut } from 'lucide-react';
+import { Loader2, ShieldCheck, LogOut, Edit3, Users, Settings, BarChart3 } from 'lucide-react'; // Added new icons
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
@@ -62,57 +62,63 @@ export default function AdminDashboardPage() {
                <CardTitle className="text-destructive">Security Notice</CardTitle>
            </CardHeader>
            <CardContent className="text-destructive/90 space-y-2">
-               <p>This is a **simulated** admin panel.</p>
-               <p>The login process (including OTP) and access control are **not secure** and rely on insecure methods (e.g., hardcoded email check, simulated OTP).</p>
-                <p><strong>Do not use this implementation in a production environment without proper backend security, authentication (e.g., Firebase custom claims for roles), and authorization checks on the server-side for every action.</strong></p>
+               <p>This is a **simulated** admin panel with basic functionality.</p>
+               <p>While login and OTP are simulated, the story editor now interacts with **live Firestore data**.</p>
+               <p>Ensure your **Firestore Security Rules** are correctly configured to only allow administrators to write/delete data in the relevant collections (`stories`, `chapters`, `users`, `siteSettings`).</p>
+                <p><strong>Do not rely solely on client-side checks. Secure all data modification actions with robust backend validation and authorization (e.g., Firebase Security Rules, Firebase Functions with role checks).</strong></p>
            </CardContent>
        </Card>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {/* Placeholder Cards for Admin Actions */}
+        {/* Link to Story Editor */}
         <Card>
           <CardHeader>
-            <CardTitle>Manage Stories</CardTitle>
+            <CardTitle className="flex items-center gap-2"><Edit3 className="w-5 h-5" /> Manage Stories</CardTitle>
             <CardDescription>Add, edit, or remove novels and chapters.</CardDescription>
           </CardHeader>
           <CardContent>
             <Button asChild>
                 <Link href="/admin/write">Go to Editor</Link>
             </Button>
-            {/* Placeholder content */}
+          </CardContent>
+        </Card>
+
+        {/* Link to Manage Users (Placeholder Page) */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2"><Users className="w-5 h-5" /> Manage Users</CardTitle>
+            <CardDescription>View user list and roles.</CardDescription>
+          </CardHeader>
+          <CardContent>
+             <Button asChild variant="secondary">
+                 <Link href="/admin/users">Manage Users</Link>
+             </Button>
+            <p className="text-sm text-muted-foreground mt-4">User role management coming soon.</p>
+          </CardContent>
+        </Card>
+
+        {/* Link to Site Settings (Placeholder Page) */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2"><Settings className="w-5 h-5" /> Site Settings</CardTitle>
+            <CardDescription>Configure general website settings.</CardDescription>
+          </CardHeader>
+          <CardContent>
+             <Button asChild variant="secondary">
+                 <Link href="/admin/settings">Site Settings</Link>
+             </Button>
             <p className="text-sm text-muted-foreground mt-4">Feature coming soon.</p>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Manage Users</CardTitle>
-            <CardDescription>View user list, roles, and permissions.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {/* Placeholder content */}
-             <p className="text-sm text-muted-foreground">Feature coming soon.</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Site Settings</CardTitle>
-            <CardDescription>Configure general website settings.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {/* Placeholder content */}
-             <p className="text-sm text-muted-foreground">Feature coming soon.</p>
-          </CardContent>
-        </Card>
+         {/* Analytics Card (Still Placeholder) */}
          <Card>
              <CardHeader>
-                <CardTitle>Analytics</CardTitle>
+                <CardTitle className="flex items-center gap-2"><BarChart3 className="w-5 h-5" /> Analytics</CardTitle>
                 <CardDescription>View website traffic and usage statistics.</CardDescription>
              </CardHeader>
              <CardContent>
-                {/* Placeholder content */}
-                 <p className="text-sm text-muted-foreground">Feature coming soon.</p>
+                 <p className="text-sm text-muted-foreground">Integration coming soon.</p>
              </CardContent>
          </Card>
       </div>

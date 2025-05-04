@@ -4,7 +4,7 @@
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/use-auth';
-import { Loader2, ShieldCheck, FileText, PlusCircle, Save, Trash2, List, Edit3, Image as ImageIcon } from 'lucide-react';
+import { Loader2, ShieldCheck, FileText, PlusCircle, Save, Trash2, List, Edit3, Image as ImageIcon, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -19,79 +19,67 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Separator } from '@/components/ui/separator';
-import { validateStoryData, validateChapterData } from '@/services/validationService'; // Import validation functions
-
-// Mock data structures for stories and chapters (replace with actual data types/fetching)
-interface Chapter {
-  id: string;
-  title: string;
-  content: string;
-  wordCount?: number; // Optional
-}
-
-interface Story {
-  id: string;
-  title: string;
-  description: string;
-  genre: string;
-  tags: string[];
-  coverImageUrl?: string;
-  chapters: Chapter[];
-  status: 'Draft' | 'Published' | 'Archived';
-}
-
-
-// Mock stories for the editor (replace with data fetched for the admin)
-const mockAdminStories: Story[] = [
-  {
-    id: 'story-admin-1',
-    title: 'The Crimson Cipher',
-    description: 'A thrilling adventure into the unknown...',
-    genre: 'Adventure',
-    tags: ['Mystery', 'Action'],
-    chapters: [
-      { id: 'ch-1', title: 'Chapter 1: The Beginning', content: 'The old map felt brittle...' },
-      { id: 'ch-2', title: 'Chapter 2: The First Clue', content: 'Deep within the ruins...' },
-    ],
-    status: 'Published',
-    coverImageUrl: 'https://picsum.photos/seed/crimson/400/600',
-  },
-  {
-    id: 'story-admin-2',
-    title: 'Project Chimera (Draft)',
-    description: 'A new sci-fi concept.',
-    genre: 'Sci-Fi',
-    tags: ['Cyberpunk', 'AI'],
-    chapters: [],
-    status: 'Draft',
-  },
-];
-
+import { validateStoryData, validateChapterData } from '@/services/validationService';
+import { fetchAdminStories, saveStory, saveChapter, deleteStory, deleteChapter } from '@/lib/firebaseService'; // Import Firebase service functions
+import type { Story, Chapter } from '@/types'; // Import shared types
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 export default function AdminWritePage() {
   const router = useRouter();
-  const { user, isAdmin, isLoading } = useAuth();
+  const { user, isAdmin, isLoading: authLoading } = useAuth();
   const { toast } = useToast();
 
   // Editor state
-  const [stories, setStories] = React.useState<Story[]>(mockAdminStories);
+  const [stories, setStories] = React.useState<Story[]>([]);
   const [selectedStory, setSelectedStory] = React.useState<Story | null>(null);
   const [selectedChapter, setSelectedChapter] = React.useState<Chapter | null>(null);
   const [isCreatingNewStory, setIsCreatingNewStory] = React.useState(false);
   const [isCreatingNewChapter, setIsCreatingNewChapter] = React.useState(false);
+  const [isLoadingStories, setIsLoadingStories] = React.useState(true); // Loading state for stories
+  const [isSaving, setIsSaving] = React.useState(false); // Saving state for story/chapter
+  const [isDeleting, setIsDeleting] = React.useState(false); // Deleting state
 
-  // Form state (could use react-hook-form for more complex scenarios)
+  // Form state
   const [storyTitle, setStoryTitle] = React.useState('');
   const [storyDescription, setStoryDescription] = React.useState('');
   const [storyGenre, setStoryGenre] = React.useState('');
-  const [storyTags, setStoryTags] = React.useState(''); // Comma-separated for simplicity
+  const [storyTags, setStoryTags] = React.useState('');
+  const [storyStatus, setStoryStatus] = React.useState<'Draft' | 'Published' | 'Archived'>('Draft');
   const [chapterTitle, setChapterTitle] = React.useState('');
   const [chapterContent, setChapterContent] = React.useState('');
+
+  // Fetch stories for the admin user on mount
+  React.useEffect(() => {
+    const loadStories = async () => {
+      if (user?.id) {
+        setIsLoadingStories(true);
+        try {
+          const fetchedStories = await fetchAdminStories(user.id); // Fetch stories associated with admin (adjust if needed)
+          setStories(fetchedStories);
+        } catch (error) {
+          console.error("Error fetching admin stories:", error);
+          toast({
+            title: "Error Fetching Stories",
+            description: "Could not load your stories. Please try again.",
+            variant: "destructive",
+          });
+        } finally {
+          setIsLoadingStories(false);
+        }
+      } else if (!authLoading) {
+          // If auth is loaded but no user, clear stories and stop loading
+          setStories([]);
+          setIsLoadingStories(false);
+      }
+    };
+
+    loadStories();
+  }, [user, authLoading, toast]);
 
 
   // Protect the route
   React.useEffect(() => {
-    if (!isLoading && (!user || !isAdmin)) {
+    if (!authLoading && (!user || !isAdmin)) {
       toast({
         title: "Access Denied",
         description: "You must be an admin to access the writing editor.",
@@ -99,7 +87,7 @@ export default function AdminWritePage() {
       });
       router.replace('/login');
     }
-  }, [user, isAdmin, isLoading, router, toast]);
+  }, [user, isAdmin, authLoading, router, toast]);
 
   // Load story/chapter data into form when selected
   React.useEffect(() => {
@@ -107,21 +95,20 @@ export default function AdminWritePage() {
       setStoryTitle(selectedStory.title);
       setStoryDescription(selectedStory.description);
       setStoryGenre(selectedStory.genre);
-      setStoryTags(selectedStory.tags.join(', '));
-      setIsCreatingNewStory(false); // Ensure we are not in creation mode
+      setStoryTags(selectedStory.tags?.join(', ') || '');
+      setStoryStatus(selectedStory.status);
+      setIsCreatingNewStory(false);
     } else {
-        // Reset form if no story selected or creating new
         setStoryTitle('');
         setStoryDescription('');
         setStoryGenre('');
         setStoryTags('');
+        setStoryStatus('Draft');
     }
-     // Reset chapter form when story changes or no story selected
     setSelectedChapter(null);
     setChapterTitle('');
     setChapterContent('');
     setIsCreatingNewChapter(false);
-
   }, [selectedStory]);
 
   React.useEffect(() => {
@@ -130,24 +117,23 @@ export default function AdminWritePage() {
         setChapterContent(selectedChapter.content);
         setIsCreatingNewChapter(false);
       } else {
-          // Reset form if no chapter selected or creating new
           setChapterTitle('');
           setChapterContent('');
       }
   }, [selectedChapter]);
 
 
-  // Handlers (Simulated - replace with actual API calls)
+  // Handlers
   const handleSelectStory = (storyId: string) => {
     const story = stories.find(s => s.id === storyId) || null;
     setSelectedStory(story);
-    setSelectedChapter(null); // Deselect chapter when story changes
+    setSelectedChapter(null);
     setIsCreatingNewStory(false);
     setIsCreatingNewChapter(false);
   };
 
   const handleSelectChapter = (chapterId: string) => {
-    const chapter = selectedStory?.chapters.find(c => c.id === chapterId) || null;
+    const chapter = selectedStory?.chapters?.find(c => c.id === chapterId) || null;
     setSelectedChapter(chapter);
     setIsCreatingNewChapter(false);
   };
@@ -157,11 +143,11 @@ export default function AdminWritePage() {
       setSelectedChapter(null);
       setIsCreatingNewStory(true);
       setIsCreatingNewChapter(false);
-      // Clear forms
       setStoryTitle('New Story Title');
       setStoryDescription('');
       setStoryGenre('');
       setStoryTags('');
+      setStoryStatus('Draft');
       setChapterTitle('');
       setChapterContent('');
   };
@@ -173,148 +159,167 @@ export default function AdminWritePage() {
        }
       setSelectedChapter(null);
       setIsCreatingNewChapter(true);
-       // Clear chapter form
       setChapterTitle('New Chapter Title');
       setChapterContent('');
   };
 
-  const handleSaveStory = () => {
-       // Validate story data
-       const tagsArray = storyTags.split(',').map(t => t.trim()).filter(t => t); // Clean tags
-       const validationError = validateStoryData({ title: storyTitle, description: storyDescription, genre: storyGenre, tags: tagsArray });
-       if (validationError) {
-           toast({ title: "Validation Error", description: validationError, variant: "destructive" });
-           return;
-       }
-
-        // Simulate saving
-        console.log("Saving story:", { title: storyTitle, description: storyDescription, genre: storyGenre, tags: tagsArray });
-        toast({ title: "Story Saved (Simulated)", description: `Story "${storyTitle}" has been saved.` });
-
-        // Update local state (in real app, you'd refetch or update based on API response)
-        if (isCreatingNewStory && selectedStory === null) { // Check selectedStory is null to avoid confusion
-            const newStory: Story = {
-                id: `story-admin-${Date.now()}`,
-                title: storyTitle,
-                description: storyDescription,
-                genre: storyGenre,
-                tags: tagsArray,
-                chapters: [],
-                status: 'Draft',
-            };
-            setStories([...stories, newStory]);
-            setSelectedStory(newStory); // Select the newly created story
-            setIsCreatingNewStory(false);
-        } else if (selectedStory) {
-            const updatedStories = stories.map(s =>
-                s.id === selectedStory.id
-                ? { ...s, title: storyTitle, description: storyDescription, genre: storyGenre, tags: tagsArray }
-                : s
-            );
-            setStories(updatedStories);
-             // Update selected story details in state if it's the one being edited
-            setSelectedStory(prev => prev ? { ...prev, title: storyTitle, description: storyDescription, genre: storyGenre, tags: tagsArray } : null);
-        }
-  };
-
-  const handleSaveChapter = () => {
-    if (!selectedStory) {
-      toast({ title: "No story selected", variant: "destructive" });
-      return;
+  const handleSaveStory = async () => {
+    if (!user?.id) {
+        toast({ title: "Authentication Error", description: "User not found.", variant: "destructive"});
+        return;
     }
+    setIsSaving(true);
+    const tagsArray = storyTags.split(',').map(t => t.trim()).filter(t => t);
+    const storyData = {
+        title: storyTitle,
+        description: storyDescription,
+        genre: storyGenre,
+        tags: tagsArray,
+        status: storyStatus,
+        authorId: user.id, // Associate story with logged-in admin
+        authorName: user.name || user.email || 'Admin', // Add author name
+        coverImageUrl: selectedStory?.coverImageUrl || '', // Keep existing or default
+        // chapters field is managed separately or within the Story type if needed
+    };
 
-    // Validate chapter data
-    const validationError = validateChapterData({ title: chapterTitle, content: chapterContent });
+    const validationError = validateStoryData(storyData);
     if (validationError) {
         toast({ title: "Validation Error", description: validationError, variant: "destructive" });
+        setIsSaving(false);
         return;
     }
 
-    // Simulate saving
-    console.log("Saving chapter:", { title: chapterTitle, content: chapterContent });
-    toast({ title: "Chapter Saved (Simulated)", description: `Chapter "${chapterTitle}" for story "${selectedStory.title}" has been saved.` });
+    try {
+        const savedStoryId = await saveStory(selectedStory?.id, storyData); // Pass existing ID if editing
+        const savedStory: Story = {
+            ...storyData,
+            id: savedStoryId,
+            chapters: selectedStory?.chapters || [], // Preserve chapters locally for now
+            reads: selectedStory?.reads || 0, // Preserve reads
+        };
 
-    // Update local state (in real app, you'd refetch or update based on API response)
-     if (isCreatingNewChapter && selectedChapter === null) {
-         const newChapter: Chapter = {
-             id: `ch-${selectedStory.id}-${Date.now()}`,
-             title: chapterTitle,
-             content: chapterContent,
-         };
-         const updatedStories = stories.map(s =>
-             s.id === selectedStory.id
-                 ? { ...s, chapters: [...s.chapters, newChapter] }
-                 : s
-         );
-         setStories(updatedStories);
-         // Also update the selectedStory state to reflect the new chapter
-         setSelectedStory(prev => prev ? { ...prev, chapters: [...prev.chapters, newChapter] } : null);
-         setSelectedChapter(newChapter); // Select the newly created chapter
-         setIsCreatingNewChapter(false);
-     } else if (selectedChapter) {
-        const updatedStories = stories.map(s => {
-            if (s.id === selectedStory.id) {
-                const updatedChapters = s.chapters.map(ch =>
-                    ch.id === selectedChapter.id
-                        ? { ...ch, title: chapterTitle, content: chapterContent }
-                        : ch
-                );
-                return { ...s, chapters: updatedChapters };
-            }
-            return s;
-        });
-        setStories(updatedStories);
-        // Update the selectedStory state
-        setSelectedStory(prev => prev ? {
-            ...prev,
-            chapters: prev.chapters.map(ch =>
-                    ch.id === selectedChapter.id
-                        ? { ...ch, title: chapterTitle, content: chapterContent }
-                        : ch
-            )
-        } : null);
-         // Update selected chapter details in state
-         setSelectedChapter(prev => prev ? { ...prev, title: chapterTitle, content: chapterContent } : null);
-     }
+        toast({ title: "Story Saved", description: `Story "${savedStory.title}" has been saved.` });
+
+        // Update local state
+        if (isCreatingNewStory) {
+            setStories(prev => [...prev, savedStory]);
+            setSelectedStory(savedStory);
+            setIsCreatingNewStory(false);
+        } else {
+            setStories(prev => prev.map(s => s.id === savedStory.id ? savedStory : s));
+             // Update selected story details in state if it's the one being edited
+             setSelectedStory(prev => prev && prev.id === savedStory.id ? savedStory : prev);
+        }
+    } catch (error) {
+        console.error("Error saving story:", error);
+        toast({ title: "Error Saving Story", description: "Could not save the story. Please try again.", variant: "destructive" });
+    } finally {
+        setIsSaving(false);
+    }
   };
 
-  const handleDeleteStory = () => {
-      if (!selectedStory) return;
-      // Confirm deletion
-      if (window.confirm(`Are you sure you want to delete the story "${selectedStory.title}" and all its chapters?`)) {
-          console.log("Deleting story:", selectedStory.id);
-          toast({ title: "Story Deleted (Simulated)", description: `Story "${selectedStory.title}" was deleted.`, variant: "destructive" });
-          setStories(stories.filter(s => s.id !== selectedStory.id));
-          setSelectedStory(null);
-          setSelectedChapter(null);
+  const handleSaveChapter = async () => {
+    if (!selectedStory?.id || !user?.id) {
+      toast({ title: "Cannot Save Chapter", description: "No story selected or user not found.", variant: "destructive" });
+      return;
+    }
+    setIsSaving(true);
+    const chapterData = {
+        title: chapterTitle,
+        content: chapterContent,
+        storyId: selectedStory.id,
+        // Calculate word count on save
+        wordCount: chapterContent.split(/\s+/).filter(Boolean).length,
+    };
+
+    const validationError = validateChapterData(chapterData);
+    if (validationError) {
+        toast({ title: "Validation Error", description: validationError, variant: "destructive" });
+        setIsSaving(false);
+        return;
+    }
+
+    try {
+        const savedChapterId = await saveChapter(selectedStory.id, selectedChapter?.id, chapterData);
+        const savedChapter: Chapter = { ...chapterData, id: savedChapterId };
+
+        toast({ title: "Chapter Saved", description: `Chapter "${savedChapter.title}" saved.` });
+
+        // Update local state
+        const updateStoryChapters = (chapters: Chapter[] | undefined) => {
+            const existingChapters = chapters || [];
+            if (isCreatingNewChapter) {
+                return [...existingChapters, savedChapter];
+            } else {
+                return existingChapters.map(ch => ch.id === savedChapter.id ? savedChapter : ch);
+            }
+        };
+
+        setStories(prevStories => prevStories.map(s =>
+            s.id === selectedStory.id ? { ...s, chapters: updateStoryChapters(s.chapters) } : s
+        ));
+        setSelectedStory(prevSelected => prevSelected ? { ...prevSelected, chapters: updateStoryChapters(prevSelected.chapters) } : null);
+
+        setSelectedChapter(savedChapter); // Select the saved/updated chapter
+        setIsCreatingNewChapter(false);
+
+    } catch (error) {
+        console.error("Error saving chapter:", error);
+        toast({ title: "Error Saving Chapter", description: "Could not save the chapter. Please try again.", variant: "destructive" });
+    } finally {
+        setIsSaving(false);
+    }
+  };
+
+  const handleDeleteStory = async () => {
+      if (!selectedStory?.id) return;
+      if (window.confirm(`Are you sure you want to delete the story "${selectedStory.title}" and ALL its chapters? This action cannot be undone.`)) {
+          setIsDeleting(true);
+          try {
+              await deleteStory(selectedStory.id);
+              toast({ title: "Story Deleted", description: `Story "${selectedStory.title}" was deleted.`, variant: "destructive" });
+              setStories(prev => prev.filter(s => s.id !== selectedStory.id));
+              setSelectedStory(null);
+              setSelectedChapter(null);
+          } catch (error) {
+              console.error("Error deleting story:", error);
+              toast({ title: "Error Deleting Story", description: "Could not delete the story. Please try again.", variant: "destructive" });
+          } finally {
+              setIsDeleting(false);
+          }
       }
   };
 
-   const handleDeleteChapter = () => {
-        if (!selectedStory || !selectedChapter) return;
-        // Confirm deletion
-       if (window.confirm(`Are you sure you want to delete the chapter "${selectedChapter.title}"?`)) {
-           console.log("Deleting chapter:", selectedChapter.id);
-           toast({ title: "Chapter Deleted (Simulated)", description: `Chapter "${selectedChapter.title}" was deleted.`, variant: "destructive" });
+   const handleDeleteChapter = async () => {
+        if (!selectedStory?.id || !selectedChapter?.id) return;
+        if (window.confirm(`Are you sure you want to delete the chapter "${selectedChapter.title}"? This action cannot be undone.`)) {
+            setIsDeleting(true);
+            try {
+                await deleteChapter(selectedStory.id, selectedChapter.id);
+                toast({ title: "Chapter Deleted", description: `Chapter "${selectedChapter.title}" was deleted.`, variant: "destructive" });
 
-            const updatedStories = stories.map(s => {
-               if (s.id === selectedStory.id) {
-                    return { ...s, chapters: s.chapters.filter(ch => ch.id !== selectedChapter.id) };
-               }
-                return s;
-            });
-            setStories(updatedStories);
-            // Update selected story state
-            setSelectedStory(prev => prev ? {
-               ...prev,
-               chapters: prev.chapters.filter(ch => ch.id !== selectedChapter.id)
-            } : null);
-            setSelectedChapter(null); // Deselect the deleted chapter
+                 // Update local state
+                const updateStoryChapters = (chapters: Chapter[] | undefined) => {
+                    return (chapters || []).filter(ch => ch.id !== selectedChapter.id);
+                };
+
+                setStories(prevStories => prevStories.map(s =>
+                    s.id === selectedStory.id ? { ...s, chapters: updateStoryChapters(s.chapters) } : s
+                ));
+                 setSelectedStory(prevSelected => prevSelected ? { ...prevSelected, chapters: updateStoryChapters(prevSelected.chapters) } : null);
+                setSelectedChapter(null); // Deselect the deleted chapter
+            } catch (error) {
+                console.error("Error deleting chapter:", error);
+                toast({ title: "Error Deleting Chapter", description: "Could not delete the chapter. Please try again.", variant: "destructive" });
+            } finally {
+                setIsDeleting(false);
+            }
         }
    };
 
+  const totalLoading = authLoading || isLoadingStories || isSaving || isDeleting;
 
-  if (isLoading || !isAdmin) {
+  if (authLoading || (!isAdmin && !authLoading) ) { // Show loader until auth check complete, or if redirecting
     return (
       <div className="flex min-h-[calc(100vh-10rem)] items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -328,6 +333,15 @@ export default function AdminWritePage() {
         <Edit3 className="w-8 h-8 text-primary" /> Story Editor
       </h1>
 
+        <Alert variant="warning" className="mb-6">
+             <AlertTriangle className="h-4 w-4" />
+             <AlertTitle>Firestore Interaction</AlertTitle>
+             <AlertDescription>
+                This editor now interacts directly with your Firestore database. Ensure your security rules are properly configured to prevent unauthorized access or modifications.
+             </AlertDescription>
+         </Alert>
+
+
       <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
         {/* Sidebar - Story & Chapter List */}
         <div className="md:col-span-3">
@@ -335,19 +349,22 @@ export default function AdminWritePage() {
             <CardHeader className="pb-3">
               <CardTitle className="text-lg flex items-center justify-between">
                  My Stories
-                  <Button size="sm" variant="outline" onClick={handleCreateNewStory}>
+                  <Button size="sm" variant="outline" onClick={handleCreateNewStory} disabled={totalLoading}>
                       <PlusCircle className="h-4 w-4 mr-1" /> New
                   </Button>
               </CardTitle>
             </CardHeader>
             <CardContent className="pt-0 space-y-2 max-h-[70vh] overflow-y-auto">
-               {stories.length === 0 && !isCreatingNewStory && (
+               {isLoadingStories && (
+                   <div className="flex justify-center p-4"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground"/></div>
+               )}
+               {!isLoadingStories && stories.length === 0 && !isCreatingNewStory && (
                    <p className="text-sm text-muted-foreground p-4 text-center">No stories yet. Click 'New' to start!</p>
                )}
-               {stories.map(story => (
+               {!isLoadingStories && stories.map(story => (
                 <Card key={story.id} className={`p-3 cursor-pointer hover:bg-secondary transition-colors ${selectedStory?.id === story.id ? 'bg-secondary border-primary' : ''}`} onClick={() => handleSelectStory(story.id)}>
                    <p className="font-medium truncate">{story.title}</p>
-                   <p className="text-xs text-muted-foreground">{story.chapters.length} Chapters | {story.status}</p>
+                   <p className="text-xs text-muted-foreground">{story.chapters?.length || 0} Chapters | {story.status}</p>
                  </Card>
               ))}
               {isCreatingNewStory && (
@@ -363,19 +380,19 @@ export default function AdminWritePage() {
                   <CardHeader className="pb-3 pt-4">
                      <CardTitle className="text-lg flex items-center justify-between">
                         Chapters
-                         <Button size="sm" variant="outline" onClick={handleCreateNewChapter} disabled={!selectedStory}>
+                         <Button size="sm" variant="outline" onClick={handleCreateNewChapter} disabled={!selectedStory || totalLoading}>
                               <PlusCircle className="h-4 w-4 mr-1" /> New
                           </Button>
                      </CardTitle>
                   </CardHeader>
                    <CardContent className="pt-0 space-y-2 max-h-[30vh] overflow-y-auto">
-                     {selectedStory.chapters.length === 0 && !isCreatingNewChapter && (
+                     {selectedStory.chapters?.length === 0 && !isCreatingNewChapter && (
                           <p className="text-sm text-muted-foreground p-4 text-center">No chapters yet.</p>
                      )}
-                    {selectedStory.chapters.map(chapter => (
+                    {selectedStory.chapters?.map(chapter => (
                       <Card key={chapter.id} className={`p-3 cursor-pointer hover:bg-secondary transition-colors ${selectedChapter?.id === chapter.id ? 'bg-secondary border-primary' : ''}`} onClick={() => handleSelectChapter(chapter.id)}>
                            <p className="font-medium truncate">{chapter.title}</p>
-                           {/* Add word count or status if needed */}
+                           <p className="text-xs text-muted-foreground">{chapter.wordCount || 0} words</p>
                         </Card>
                     ))}
                      {isCreatingNewChapter && (
@@ -391,16 +408,17 @@ export default function AdminWritePage() {
         </div>
 
         {/* Main Editor Area */}
-        <div className="md:col-span-9">
+        <div className="md:col-span-9 space-y-6">
            {/* Story Details Form */}
             {(selectedStory || isCreatingNewStory) && (
-            <Card className="mb-6">
+            <Card>
                 <CardHeader>
                   <CardTitle className="flex justify-between items-center">
-                    {isCreatingNewStory ? 'Create New Story' : 'Edit Story Details'}
+                    {isCreatingNewStory ? 'Create New Story' : `Edit Story: ${selectedStory?.title}`}
                     {!isCreatingNewStory && selectedStory && (
-                         <Button variant="destructive" size="sm" onClick={handleDeleteStory} disabled={!selectedStory}>
-                             <Trash2 className="h-4 w-4 mr-1" /> Delete Story
+                         <Button variant="destructive" size="sm" onClick={handleDeleteStory} disabled={!selectedStory || totalLoading}>
+                             {isDeleting ? <Loader2 className="h-4 w-4 mr-1 animate-spin"/> : <Trash2 className="h-4 w-4 mr-1" />}
+                             Delete Story
                          </Button>
                     )}
                   </CardTitle>
@@ -409,21 +427,21 @@ export default function AdminWritePage() {
                 <CardContent className="space-y-4">
                    <div>
                       <Label htmlFor="storyTitle">Title</Label>
-                       <Input id="storyTitle" value={storyTitle} onChange={(e) => setStoryTitle(e.target.value)} placeholder="Enter story title" />
+                       <Input id="storyTitle" value={storyTitle} onChange={(e) => setStoryTitle(e.target.value)} placeholder="Enter story title" disabled={totalLoading}/>
                     </div>
                     <div>
                        <Label htmlFor="storyDescription">Description</Label>
-                       <Textarea id="storyDescription" value={storyDescription} onChange={(e) => setStoryDescription(e.target.value)} placeholder="Enter a short description or synopsis" rows={4} />
+                       <Textarea id="storyDescription" value={storyDescription} onChange={(e) => setStoryDescription(e.target.value)} placeholder="Enter a short description or synopsis" rows={4} disabled={totalLoading}/>
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
                            <Label htmlFor="storyGenre">Genre</Label>
-                           <Select value={storyGenre} onValueChange={setStoryGenre}>
+                           <Select value={storyGenre} onValueChange={setStoryGenre} disabled={totalLoading}>
                                <SelectTrigger id="storyGenre">
                                  <SelectValue placeholder="Select genre" />
                                </SelectTrigger>
                                <SelectContent>
-                                   {/* Populate with your genres */}
+                                   {/* Add more genres as needed */}
                                    <SelectItem value="Adventure">Adventure</SelectItem>
                                    <SelectItem value="Fantasy">Fantasy</SelectItem>
                                    <SelectItem value="Sci-Fi">Sci-Fi</SelectItem>
@@ -431,32 +449,51 @@ export default function AdminWritePage() {
                                    <SelectItem value="Thriller">Thriller</SelectItem>
                                    <SelectItem value="Horror">Horror</SelectItem>
                                    <SelectItem value="Mystery">Mystery</SelectItem>
-                                    <SelectItem value="Contemporary">Contemporary</SelectItem>
-                                    <SelectItem value="Humor">Humor</SelectItem>
-                                    <SelectItem value="Paranormal">Paranormal</SelectItem>
-                                    <SelectItem value="Poetry">Poetry</SelectItem>
-                                    <SelectItem value="Military Fiction">Military Fiction</SelectItem>
-                                    <SelectItem value="Cyberpunk">Cyberpunk</SelectItem>
-                                   {/* ... more genres */}
+                                   <SelectItem value="Contemporary">Contemporary</SelectItem>
+                                   <SelectItem value="Humor">Humor</SelectItem>
+                                   <SelectItem value="Paranormal">Paranormal</SelectItem>
+                                   <SelectItem value="Poetry">Poetry</SelectItem>
+                                   <SelectItem value="Military Fiction">Military Fiction</SelectItem>
+                                   <SelectItem value="Cyberpunk">Cyberpunk</SelectItem>
+                                   <SelectItem value="Historical">Historical</SelectItem>
+                                   <SelectItem value="Fanfiction">Fanfiction</SelectItem>
+                                   <SelectItem value="Urban Fantasy">Urban Fantasy</SelectItem>
+                                   <SelectItem value="Young Adult">Young Adult</SelectItem>
                                </SelectContent>
                            </Select>
                          </div>
                          <div>
                             <Label htmlFor="storyTags">Tags (comma-separated)</Label>
-                            <Input id="storyTags" value={storyTags} onChange={(e) => setStoryTags(e.target.value)} placeholder="e.g., magic, quest, dragon" />
+                            <Input id="storyTags" value={storyTags} onChange={(e) => setStoryTags(e.target.value)} placeholder="e.g., magic, quest, dragon" disabled={totalLoading}/>
                          </div>
+                    </div>
+                     <div>
+                       <Label htmlFor="storyStatus">Status</Label>
+                        <Select value={storyStatus} onValueChange={(value: Story['status']) => setStoryStatus(value)} disabled={totalLoading}>
+                            <SelectTrigger id="storyStatus">
+                                <SelectValue placeholder="Select status" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="Draft">Draft</SelectItem>
+                                <SelectItem value="Published">Published</SelectItem>
+                                <SelectItem value="Archived">Archived</SelectItem>
+                            </SelectContent>
+                        </Select>
                     </div>
                      <div>
                        <Label htmlFor="coverImage">Cover Image (Placeholder)</Label>
                        <div className="flex items-center gap-2 mt-1">
                           {selectedStory?.coverImageUrl && !isCreatingNewStory && (
-                              <img src={selectedStory.coverImageUrl} alt="Current Cover" className="h-16 w-auto rounded border" />
+                              <img src={selectedStory.coverImageUrl} alt="Current Cover" className="h-16 w-auto rounded border bg-muted" />
                           )}
-                          <Button variant="outline" size="sm"><ImageIcon className="h-4 w-4 mr-1" /> Upload Cover</Button>
+                          <Button variant="outline" size="sm" disabled={totalLoading}><ImageIcon className="h-4 w-4 mr-1" /> Upload Cover</Button>
                           <p className="text-xs text-muted-foreground">Upload feature coming soon.</p>
                         </div>
                      </div>
-                    <Button onClick={handleSaveStory}><Save className="h-4 w-4 mr-1" /> Save Story Details</Button>
+                    <Button onClick={handleSaveStory} disabled={totalLoading}>
+                      {isSaving ? <Loader2 className="h-4 w-4 mr-1 animate-spin"/> : <Save className="h-4 w-4 mr-1" />}
+                      {isCreatingNewStory ? 'Create Story' : 'Save Story Details'}
+                    </Button>
                 </CardContent>
             </Card>
            )}
@@ -466,10 +503,11 @@ export default function AdminWritePage() {
                <Card>
                    <CardHeader>
                       <CardTitle className="flex justify-between items-center">
-                         {isCreatingNewChapter ? 'Create New Chapter' : `Edit Chapter: ${selectedChapter?.title || ''}`}
+                         {isCreatingNewChapter ? `Create New Chapter for "${selectedStory.title}"` : `Edit Chapter: ${selectedChapter?.title || ''}`}
                           {!isCreatingNewChapter && selectedChapter && (
-                               <Button variant="destructive" size="sm" onClick={handleDeleteChapter} disabled={!selectedChapter}>
-                                   <Trash2 className="h-4 w-4 mr-1" /> Delete Chapter
+                               <Button variant="destructive" size="sm" onClick={handleDeleteChapter} disabled={!selectedChapter || totalLoading}>
+                                   {isDeleting ? <Loader2 className="h-4 w-4 mr-1 animate-spin"/> : <Trash2 className="h-4 w-4 mr-1" />}
+                                   Delete Chapter
                                </Button>
                           )}
                       </CardTitle>
@@ -478,23 +516,33 @@ export default function AdminWritePage() {
                    <CardContent className="space-y-4">
                        <div>
                            <Label htmlFor="chapterTitle">Chapter Title</Label>
-                           <Input id="chapterTitle" value={chapterTitle} onChange={(e) => setChapterTitle(e.target.value)} placeholder="Enter chapter title" />
+                           <Input id="chapterTitle" value={chapterTitle} onChange={(e) => setChapterTitle(e.target.value)} placeholder="Enter chapter title" disabled={totalLoading}/>
                        </div>
                        <div>
                            <Label htmlFor="chapterContent">Content</Label>
-                           {/* Basic Textarea - Replace with a Rich Text Editor (e.g., TipTap, Slate.js) for better formatting */}
-                           <Textarea id="chapterContent" value={chapterContent} onChange={(e) => setChapterContent(e.target.value)} placeholder="Start writing your chapter here..." rows={20} className="font-serif text-base leading-relaxed" />
+                           <Textarea
+                              id="chapterContent"
+                              value={chapterContent}
+                              onChange={(e) => setChapterContent(e.target.value)}
+                              placeholder="Start writing your chapter here..."
+                              rows={20}
+                              className="font-serif text-base leading-relaxed"
+                              disabled={totalLoading}
+                           />
                        </div>
                        <div className="flex justify-between items-center">
                            <span className="text-sm text-muted-foreground">Word Count: {chapterContent.split(/\s+/).filter(Boolean).length}</span>
-                           <Button onClick={handleSaveChapter}><Save className="h-4 w-4 mr-1" /> Save Chapter</Button>
+                           <Button onClick={handleSaveChapter} disabled={totalLoading}>
+                             {isSaving ? <Loader2 className="h-4 w-4 mr-1 animate-spin"/> : <Save className="h-4 w-4 mr-1" />}
+                             {isCreatingNewChapter ? 'Create Chapter' : 'Save Chapter'}
+                           </Button>
                        </div>
                    </CardContent>
                </Card>
            )}
 
             {/* Placeholder when nothing is selected */}
-             {!selectedStory && !isCreatingNewStory && (
+             {!selectedStory && !isCreatingNewStory && !isLoadingStories && (
                 <div className="text-center py-20 text-muted-foreground border-2 border-dashed border-border rounded-lg">
                     <FileText className="mx-auto h-12 w-12 mb-4" />
                     <p>Select a story from the left or create a new one to start editing.</p>
@@ -503,7 +551,7 @@ export default function AdminWritePage() {
              {selectedStory && !selectedChapter && !isCreatingNewChapter && (
                 <div className="text-center py-20 text-muted-foreground border-2 border-dashed border-border rounded-lg">
                    <List className="mx-auto h-12 w-12 mb-4" />
-                    <p>Select a chapter from the list above or create a new one to start editing.</p>
+                    <p>Select a chapter from the list above or create a new one.</p>
                  </div>
              )}
 
