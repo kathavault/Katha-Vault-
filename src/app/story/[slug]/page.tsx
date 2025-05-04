@@ -11,10 +11,24 @@ import { Separator } from '@/components/ui/separator';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { BookOpen, Eye, Users, MessageSquare, ThumbsUp, List, PlusCircle, Library, CheckCircle, Star, Share2, Send } from 'lucide-react'; // Added/updated icons
-import type { Story } from '@/components/story/story-card'; // Reuse Story type
+import type { Story as BaseStory } from '@/components/story/story-card'; // Rename imported Story
 import React, { useEffect, useState } from 'react'; // Import React and hooks
 import { useAuth } from '@/hooks/use-auth'; // Import useAuth
 import { Textarea } from '@/components/ui/textarea'; // Import Textarea
+import { useToast } from '@/hooks/use-toast'; // Import useToast
+import { validateCommentData, validateRatingData } from '@/services/validationService'; // Import validation functions
+
+// Re-type BaseStory author to be an object
+interface Author {
+    name: string;
+    id: string; // Assuming an ID for linking later
+    avatarUrl?: string; // Optional avatar URL
+}
+
+export interface Story extends Omit<BaseStory, 'author'> {
+    author: Author;
+}
+
 
 // Define extended Story type for this page
 interface StoryDetails extends Story {
@@ -79,6 +93,7 @@ interface StoryPageProps {
 
 const StoryDetailPage: NextPage<StoryPageProps> = ({ params }) => {
   const { user, isLoading: authLoading } = useAuth(); // Get user state
+  const { toast } = useToast(); // Initialize toast
   const [story, setStory] = useState<StoryDetails | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [commentText, setCommentText] = useState('');
@@ -101,36 +116,58 @@ const StoryDetailPage: NextPage<StoryPageProps> = ({ params }) => {
 
   // Handle comment submission (placeholder)
   const handleCommentSubmit = () => {
-      if (!user) return;
-      if (commentText.trim() === '') return;
+      if (!user) {
+         toast({ title: "Login Required", description: "Please log in to leave a comment.", variant: "destructive" });
+         return;
+      }
+      // Validate comment
+       const validationError = validateCommentData({ text: commentText });
+       if (validationError) {
+           toast({ title: "Validation Error", description: validationError, variant: "destructive" });
+           return;
+       }
+
       console.log(`Submitting comment for story ${story?.title}:`, commentText);
       // Add actual comment submission logic here (API call)
+       toast({ title: "Comment Posted (Simulated)", description: "Your comment has been added." });
       setCommentText('');
   };
 
   // Handle overall story rating submission (placeholder)
    const handleRateStory = (newRating: number) => {
-       if (!user) return;
+       if (!user) {
+           toast({ title: "Login Required", description: "Please log in to rate.", variant: "destructive" });
+           return;
+       }
+        // Validate rating
+        const validationError = validateRatingData({ rating: newRating });
+        if (validationError) {
+            toast({ title: "Validation Error", description: validationError, variant: "destructive" });
+            return;
+        }
+
        setRating(newRating);
        console.log(`Submitting overall rating for story ${story?.title}:`, newRating);
        // Add actual rating submission logic here (API call)
+       toast({ title: "Rating Submitted (Simulated)", description: `You rated this story ${newRating} stars.` });
    };
 
    // Handle Share (placeholder)
    const handleShareStory = () => {
       console.log("Sharing story:", story?.title);
       // Implement actual sharing logic
+      toast({ title: "Share Feature (Coming Soon)", description: "Sharing options will be available here." });
    };
 
     // Handle Add/Remove from Library (placeholder)
    const handleToggleLibrary = () => {
        if (!user) {
-          // Redirect to login or show toast
-           console.log("User must log in to manage library");
+           toast({ title: "Login Required", description: "Please log in to manage your library.", variant: "destructive" });
            return;
        }
        console.log(isInLibrary ? "Removing from library" : "Adding to library");
        // Add actual API call here
+        toast({ title: `Story ${isInLibrary ? 'Removed From' : 'Added To'} Library (Simulated)` });
        setIsInLibrary(!isInLibrary);
    };
 
@@ -274,19 +311,19 @@ const StoryDetailPage: NextPage<StoryPageProps> = ({ params }) => {
         <div className="space-y-3">
           <h1 className="text-3xl md:text-4xl font-bold leading-tight text-foreground">{story.title}</h1>
            {/* Author Info */}
-           <div className="flex items-center gap-3"> 
-              <Link href={`/user/${story.author.name.toLowerCase().replace(/\s+/g, '-')}`} className="flex items-center gap-3 group">
+           <div className="flex items-center gap-3">
+              <Link href={`/user/${story.author.id}`} className="flex items-center gap-3 group">
                  <Avatar className="h-11 w-11 border-2 border-border group-hover:border-primary transition-colors">
-                    <AvatarImage src={`https://picsum.photos/seed/${story.author.name}/100/100`} alt={story.author.name} data-ai-hint="author profile picture large" />
+                    <AvatarImage src={story.author.avatarUrl || `https://picsum.photos/seed/${story.author.name}/100/100`} alt={story.author.name} data-ai-hint="author profile picture large" />
                      <AvatarFallback>{story.author.name.substring(0, 1).toUpperCase()}</AvatarFallback>
                  </Avatar>
                  <div>
                     <p className="font-semibold text-lg group-hover:text-primary transition-colors">{story.author.name}</p>
                     <p className="text-sm text-muted-foreground">{story.authorFollowers.toLocaleString()} Followers</p>
-                </div> 
+                </div>
               </Link>
               {/* Follow Button Placeholder */}
-               {user && user.email !== story.author && ( // Don't show follow for self
+               {user && user.id !== story.author.id && ( // Don't show follow for self
                   <Button variant="outline" size="sm" className="ml-4">Follow</Button>
                )}
            </div>

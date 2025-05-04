@@ -19,6 +19,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Separator } from '@/components/ui/separator';
+import { validateStoryData, validateChapterData } from '@/services/validationService'; // Import validation functions
 
 // Mock data structures for stories and chapters (replace with actual data types/fetching)
 interface Chapter {
@@ -39,41 +40,6 @@ interface Story {
   status: 'Draft' | 'Published' | 'Archived';
 }
 
-// Validation function for story data
-const validateStoryData = (data: { title: string; description: string; genre: string }): string | null => {
-    if (!data.title || data.title.trim().length === 0) {
-        return "Story title cannot be empty.";
-    }
-    if (data.title.length > 100) { // Example max length
-        return "Story title cannot exceed 100 characters.";
-    }
-    if (!data.genre) {
-        return "Please select a genre for the story.";
-    }
-    if (!data.description || data.description.trim().length === 0) {
-        return "Story description cannot be empty.";
-    }
-    if (data.description.length > 1000) { // Example max length
-        return "Story description cannot exceed 1000 characters.";
-    }
-    // Add more validation rules as needed (e.g., for tags)
-    return null; // No validation errors
-};
-
-// Validation function for chapter data
-const validateChapterData = (data: { title: string; content: string }): string | null => {
-    if (!data.title || data.title.trim().length === 0) {
-        return "Chapter title cannot be empty.";
-    }
-    if (data.title.length > 150) { // Example max length
-        return "Chapter title cannot exceed 150 characters.";
-    }
-    if (!data.content || data.content.trim().length === 0) {
-        return "Chapter content cannot be empty.";
-    }
-    // Add more validation rules as needed
-    return null; // No validation errors
-};
 
 // Mock stories for the editor (replace with data fetched for the admin)
 const mockAdminStories: Story[] = [
@@ -214,14 +180,15 @@ export default function AdminWritePage() {
 
   const handleSaveStory = () => {
        // Validate story data
-       const validationError = validateStoryData({ title: storyTitle, description: storyDescription, genre: storyGenre });
+       const tagsArray = storyTags.split(',').map(t => t.trim()).filter(t => t); // Clean tags
+       const validationError = validateStoryData({ title: storyTitle, description: storyDescription, genre: storyGenre, tags: tagsArray });
        if (validationError) {
            toast({ title: "Validation Error", description: validationError, variant: "destructive" });
            return;
        }
 
         // Simulate saving
-        console.log("Saving story:", { title: storyTitle, description: storyDescription, genre: storyGenre, tags: storyTags.split(',').map(t => t.trim()) });
+        console.log("Saving story:", { title: storyTitle, description: storyDescription, genre: storyGenre, tags: tagsArray });
         toast({ title: "Story Saved (Simulated)", description: `Story "${storyTitle}" has been saved.` });
 
         // Update local state (in real app, you'd refetch or update based on API response)
@@ -231,7 +198,7 @@ export default function AdminWritePage() {
                 title: storyTitle,
                 description: storyDescription,
                 genre: storyGenre,
-                tags: storyTags.split(',').map(t => t.trim()).filter(t => t),
+                tags: tagsArray,
                 chapters: [],
                 status: 'Draft',
             };
@@ -241,12 +208,12 @@ export default function AdminWritePage() {
         } else if (selectedStory) {
             const updatedStories = stories.map(s =>
                 s.id === selectedStory.id
-                ? { ...s, title: storyTitle, description: storyDescription, genre: storyGenre, tags: storyTags.split(',').map(t => t.trim()).filter(t => t) }
+                ? { ...s, title: storyTitle, description: storyDescription, genre: storyGenre, tags: tagsArray }
                 : s
             );
             setStories(updatedStories);
              // Update selected story details in state if it's the one being edited
-            setSelectedStory(prev => prev ? { ...prev, title: storyTitle, description: storyDescription, genre: storyGenre, tags: storyTags.split(',').map(t => t.trim()).filter(t => t) } : null);
+            setSelectedStory(prev => prev ? { ...prev, title: storyTitle, description: storyDescription, genre: storyGenre, tags: tagsArray } : null);
         }
   };
 
@@ -545,6 +512,3 @@ export default function AdminWritePage() {
     </div>
   );
 }
-
-
-    

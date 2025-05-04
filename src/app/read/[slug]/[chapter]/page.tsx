@@ -18,6 +18,8 @@ import { useAuth } from '@/hooks/use-auth'; // Import useAuth hook
 import { Textarea } from '@/components/ui/textarea'; // Import Textarea
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'; // Import Card components
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'; // For comment display
+import { useToast } from '@/hooks/use-toast'; // Import useToast
+import { validateCommentData, validateRatingData } from '@/services/validationService'; // Import validation functions
 
 // Mock data structure (keep for now, will replace with actual fetching)
 interface ChapterData {
@@ -142,6 +144,7 @@ const ReadingPage: NextPage<ReadPageProps> = ({ params }) => {
   const { slug } = params;
   const chapterNumber = parseInt(params.chapter, 10);
   const { user, isLoading: authLoading } = useAuth(); // Get user state
+  const { toast } = useToast(); // Initialize toast
   const [chapterData, setChapterData] = useState<ChapterData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [commentText, setCommentText] = useState(''); // State for comment input
@@ -166,31 +169,46 @@ const ReadingPage: NextPage<ReadPageProps> = ({ params }) => {
   // Handle comment submission (placeholder)
   const handleCommentSubmit = () => {
       if (!user) {
-          // Optionally prompt login
-          console.log("User must be logged in to comment.");
+          toast({ title: "Login Required", description: "Please log in to leave a comment.", variant: "destructive" });
           return;
       }
-      if (commentText.trim() === '') return;
+       // Validate comment
+       const validationError = validateCommentData({ text: commentText });
+       if (validationError) {
+           toast({ title: "Validation Error", description: validationError, variant: "destructive" });
+           return;
+       }
+
       console.log(`Submitting comment for chapter ${chapterNumber}:`, commentText);
       // Add actual comment submission logic here (API call)
+      toast({ title: "Comment Posted (Simulated)", description: "Your comment has been added." });
       setCommentText(''); // Clear input after submit
   };
 
    // Handle rating submission (placeholder)
    const handleRate = (newRating: number) => {
        if (!user) {
-           console.log("User must be logged in to rate.");
-           return;
+            toast({ title: "Login Required", description: "Please log in to rate.", variant: "destructive" });
+            return;
        }
+        // Validate rating
+        const validationError = validateRatingData({ rating: newRating });
+        if (validationError) {
+            toast({ title: "Validation Error", description: validationError, variant: "destructive" });
+            return;
+        }
+
        setRating(newRating);
        console.log(`Submitting rating for chapter ${chapterNumber}:`, newRating);
        // Add actual rating submission logic here (API call)
+       toast({ title: "Rating Submitted (Simulated)", description: `You rated this chapter ${newRating} stars.` });
    };
 
     // Handle Share (placeholder)
    const handleShare = () => {
       console.log("Sharing chapter:", chapterData?.title);
       // Implement actual sharing logic (e.g., using Web Share API or social links)
+      toast({ title: "Share Feature (Coming Soon)", description: "Sharing options will be available here." });
    };
 
 
