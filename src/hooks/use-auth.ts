@@ -13,6 +13,7 @@ import {
   sendEmailVerification, // Import for email verification
   AuthErrorCodes, // Import error codes
   applyActionCode, // For email verification link handling
+  getIdTokenResult, // Import to get custom claims
 } from 'firebase/auth';
 import { auth } from '@/lib/firebase'; // Import auth from firebase setup
 import { useToast } from './use-toast'; // Import useToast
@@ -24,41 +25,55 @@ export interface User {
   name?: string | null;
   avatarUrl?: string | null;
   emailVerified: boolean; // Add email verification status
+  isAdmin?: boolean; // Add isAdmin flag based on custom claims
 }
-
-// Define the simulated admin email
-// WARNING: Hardcoding admin email is NOT secure for production. Use roles/custom claims.
-export const ADMIN_EMAIL = "kathavault@gmail.com";
 
 // Define the hook
 export function useAuth() {
   const [user, setUser] = useState<User | null>(null);
   const [isAdmin, setIsAdmin] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(true); // Start loading
-  const [isVerifyingAdminOtp, setIsVerifyingAdminOtp] = useState<boolean>(false); // Track admin OTP state
+  // WARNING: The OTP verification flow below is a SIMULATION and NOT secure for production.
+  // It should be replaced with a proper multi-factor authentication system.
+  const [isVerifyingAdminOtp, setIsVerifyingAdminOtp] = useState<boolean>(false); // Track *simulated* admin OTP state
   const { toast } = useToast();
 
   // Effect to listen for Firebase auth state changes
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (firebaseUser: FirebaseUser | null) => {
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser: FirebaseUser | null) => {
+      setIsLoading(true); // Set loading true whenever auth state might change
       if (firebaseUser) {
         // User is signed in
+        let adminStatus = false;
+        try {
+          // Check for admin custom claim
+          const idTokenResult = await firebaseUser.getIdTokenResult(true); // Force refresh token
+          adminStatus = !!idTokenResult.claims.admin; // Check if admin claim exists and is true
+          console.log("Admin claim found:", adminStatus); // Log for debugging
+        } catch (error) {
+            console.error("Error fetching custom claims:", error);
+            // Handle error fetching claims, maybe default to non-admin
+            adminStatus = false;
+        }
+
         const appUser: User = {
           id: firebaseUser.uid,
           email: firebaseUser.email,
           name: firebaseUser.displayName,
           avatarUrl: firebaseUser.photoURL,
           emailVerified: firebaseUser.emailVerified, // Get verification status
+          isAdmin: adminStatus, // Set based on custom claim
         };
         setUser(appUser);
-        // WARNING: Checking email directly for admin role is NOT secure for production.
-        // Use Firebase custom claims or a dedicated role management system.
-        const isAdminUser = appUser.email === ADMIN_EMAIL;
-        setIsAdmin(isAdminUser);
-        // If admin logs in, don't immediately assume full access, wait for OTP step
-        // Also ensure non-admins don't get stuck in OTP state
-        // WARNING: Tying admin OTP to email verification status is a placeholder, NOT a secure OTP mechanism.
-        setIsVerifyingAdminOtp(isAdminUser && !appUser.emailVerified);
+        setIsAdmin(adminStatus);
+
+        // Trigger simulated OTP step ONLY if the user is confirmed as admin via claims
+        // AND hasn't completed the simulated OTP step yet in this session.
+        // IMPORTANT: This is still a simulation. Real MFA is needed.
+        // Let's simplify: If admin logs in (claim verified), trigger OTP simulation.
+        // Reset OTP state on user change.
+        setIsVerifyingAdminOtp(adminStatus); // Trigger OTP if admin claim is true
+
       } else {
         // User is signed out
         setUser(null);
@@ -86,11 +101,6 @@ export function useAuth() {
         description: "Please check your email to verify your account before logging in.",
         duration: 6000, // Give more time to read
       });
-
-      // User needs to verify email before they are fully logged in by our app logic
-      // onAuthStateChanged will initially set the user, but we might log them out
-      // immediately if emailVerified is false, depending on app requirements.
-      // For now, just let them know verification is needed.
 
       // Sign the user out immediately after signup until they verify
       await signOut(auth);
@@ -120,9 +130,18 @@ export function useAuth() {
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
       const firebaseUser = userCredential.user;
 
-      // Check if email is verified
-      if (!firebaseUser.emailVerified && email !== ADMIN_EMAIL) {
-        await signOut(auth); // Log out user if email not verified (except admin)
+      // Check for admin custom claim after login
+       let adminStatus = false;
+       try {
+           const idTokenResult = await firebaseUser.getIdTokenResult(true); // Force refresh
+           adminStatus = !!idTokenResult.claims.admin;
+       } catch (claimError) {
+           console.error("Error fetching claims on login:", claimError);
+       }
+
+      // Check if email is verified (unless it's an admin logging in)
+      if (!firebaseUser.emailVerified && !adminStatus) {
+        await signOut(auth); // Log out non-admin user if email not verified
         toast({
           title: "Email Not Verified",
           description: "Please verify your email address before logging in. Check your inbox for the verification link.",
@@ -134,15 +153,12 @@ export function useAuth() {
       }
 
       // Don't set user state here, onAuthStateChanged handles it
-      // WARNING: Checking email directly for admin role is NOT secure for production.
-      // Use Firebase custom claims or a dedicated role management system.
-      const isAdminUser = firebaseUser.email === ADMIN_EMAIL;
-      setIsAdmin(isAdminUser); // Set admin status immediately for conditional logic
+      setIsAdmin(adminStatus); // Set admin status immediately for conditional logic
 
-      if (isAdminUser) {
-        // Admin flow: Requires OTP after password login
+      if (adminStatus) {
+        // Admin flow: Requires simulated OTP after password login
         // WARNING: This OTP flow is simulated and NOT secure for production.
-        setIsVerifyingAdminOtp(true);
+        setIsVerifyingAdminOtp(true); // Trigger simulated OTP step
         // Redirect handled in LoginPage based on isAdmin and isVerifyingAdminOtp
       } else {
         // Regular user flow
@@ -157,23 +173,21 @@ export function useAuth() {
         name: firebaseUser.displayName,
         avatarUrl: firebaseUser.photoURL,
         emailVerified: firebaseUser.emailVerified,
+        isAdmin: adminStatus,
       };
-      return appUser; // Return for immediate use if needed
+      // Let onAuthStateChanged handle setting the final user state.
+      // Return user object for immediate use if needed, but rely on context for consistency.
+      return appUser;
     } catch (error: any) {
       console.error("Email login error:", error);
       let description = "Login failed. Please check your credentials.";
-      if (error.code === AuthErrorCodes.USER_DELETED || // More specific errors
-          error.code === AuthErrorCodes.USER_DISABLED ||
-          error.code === AuthErrorCodes.INVALID_EMAIL ||
-          error.code === AuthErrorCodes.INVALID_PASSWORD ||
-          error.code === AuthErrorCodes.INVALID_LOGIN_CREDENTIALS || // Common for wrong email/password
-          error.code === 'auth/user-not-found' || // Legacy codes just in case
-          error.code === 'auth/wrong-password'
-      ) {
-        description = "Invalid email or password.";
-      } else if (error.message) {
+       if (error.code === AuthErrorCodes.INVALID_LOGIN_CREDENTIALS ||
+           error.code === 'auth/invalid-credential' // Newer SDK version code
+           ) {
+           description = "Invalid email or password.";
+       } else if (error.message) {
           description = error.message;
-      }
+       }
       toast({ title: "Login Failed", description, variant: "destructive" });
       setIsLoading(false);
       return null;
@@ -187,7 +201,7 @@ export function useAuth() {
     try {
       const result = await signInWithPopup(auth, provider);
       const firebaseUser = result.user;
-      // State updated by onAuthStateChanged
+      // State updated by onAuthStateChanged, which will check claims
       setIsLoading(false);
       const appUser: User = {
         id: firebaseUser.uid,
@@ -195,14 +209,12 @@ export function useAuth() {
         name: firebaseUser.displayName,
         avatarUrl: firebaseUser.photoURL,
         emailVerified: firebaseUser.emailVerified, // Google accounts are usually verified
+        // isAdmin will be set by onAuthStateChanged after checking claims
       };
-      // Check if admin (though unlikely via Google unless it matches ADMIN_EMAIL)
-      const isAdminUser = appUser.email === ADMIN_EMAIL;
-      setIsAdmin(isAdminUser);
-      setIsVerifyingAdminOtp(false); // Assume Google users don't need OTP
+      setIsVerifyingAdminOtp(false); // Social logins bypass simulated OTP for now
 
       toast({ title: "Login Successful", description: `Welcome, ${appUser.name || 'User'}!` });
-      return appUser;
+      return appUser; // Let onAuthStateChanged handle setting context state
     } catch (error: any) {
       console.error("Google sign-in error:", error);
       let description = "Could not sign in with Google.";
@@ -229,24 +241,20 @@ export function useAuth() {
     try {
       const result = await signInWithPopup(auth, provider);
       const firebaseUser = result.user;
-      // State updated by onAuthStateChanged
+      // State updated by onAuthStateChanged, which will check claims
       setIsLoading(false);
       const appUser: User = {
         id: firebaseUser.uid,
         email: firebaseUser.email,
         name: firebaseUser.displayName,
         avatarUrl: firebaseUser.photoURL,
-        // Facebook login might require email verification step if email not verified by FB
-        // For simplicity, we'll trust FB for now, but production might need checks
-        emailVerified: true,
+        emailVerified: true, // Assume verified for simplicity
+        // isAdmin will be set by onAuthStateChanged after checking claims
       };
-       // Check if admin
-       const isAdminUser = appUser.email === ADMIN_EMAIL;
-       setIsAdmin(isAdminUser);
-       setIsVerifyingAdminOtp(false); // Assume FB users don't need OTP
+      setIsVerifyingAdminOtp(false); // Social logins bypass simulated OTP for now
 
       toast({ title: "Login Successful", description: `Welcome, ${appUser.name || 'User'}!` });
-      return appUser;
+      return appUser; // Let onAuthStateChanged handle setting context state
     } catch (error: any) {
       console.error("Facebook sign-in error:", error);
       let description = "Could not sign in with Facebook.";
@@ -266,39 +274,33 @@ export function useAuth() {
     }
   };
 
-  // Simulate OTP verification (only checks if admin email was used initially)
+  // Simulate OTP verification
   // WARNING: THIS IS A SIMULATION AND NOT SECURE FOR PRODUCTION.
-  // A real OTP system requires a backend to generate, send (via SMS/Email), and verify codes securely.
-  // Do NOT use this implementation in a real application.
+  // It only proceeds if the user has already been identified as admin via custom claims.
   const verifyAdminOtp = useCallback(async (phoneOtp: string, emailOtp: string): Promise<boolean> => {
-    if (!user || !isAdmin) {
+    if (!user || !isAdmin) { // Check claim-based isAdmin status
       toast({ title: "Error", description: "Admin user not properly logged in.", variant: "destructive" });
       return false;
     }
     setIsLoading(true);
     return new Promise((resolve) => {
       setTimeout(() => {
-        // --- SIMULATION NOTE ---
-        // This is still a simulation. A real implementation would involve
-        // a backend service to validate OTPs sent via SMS/Email.
-        // For now, just check non-empty OTPs for the logged-in admin.
-        // Correct OTPs (for simulation): phone '9756745653' -> '123456', email 'superworth00@gmail.com' -> '654321'
-        // --- --- --- ---
-         const correctPhoneOtp = "123456"; // Example correct phone OTP
-         const correctEmailOtp = "654321"; // Example correct email OTP
-
+         // Simulate checking hardcoded OTPs for demonstration ONLY
+         const correctPhoneOtp = "123456";
+         const correctEmailOtp = "654321";
          const success = phoneOtp === correctPhoneOtp && emailOtp === correctEmailOtp;
 
         setIsLoading(false);
         if (success) {
           console.log("Simulated Admin OTP verification successful.");
-          setIsVerifyingAdminOtp(false); // Mark OTP verification as complete
+          setIsVerifyingAdminOtp(false); // Mark OTP verification as complete for this session
           toast({ title: "Admin Verification Successful", description: "Welcome, Admin!" });
           resolve(true);
         } else {
           console.log("Simulated Admin OTP verification failed.");
           toast({ title: "OTP Verification Failed", description: "Incorrect OTPs provided. Please try again.", variant: "destructive" });
           // Don't log out, let them retry OTP on the OTP page.
+          // OTP state remains true.
           resolve(false);
         }
       }, 700); // Simulate validation latency
@@ -313,12 +315,11 @@ export function useAuth() {
       await signOut(auth);
       // State updates handled by onAuthStateChanged
       toast({ title: "Logged Out", description: "You have been successfully logged out." });
-      // No need to manually set user/admin state here
     } catch (error: any) {
       console.error("Logout error:", error);
       toast({ title: "Logout Failed", description: error.message || "Could not log out.", variant: "destructive" });
     } finally {
-      setIsLoading(false); // Ensure loading state is reset even if logout fails
+      setIsLoading(false); // Ensure loading state is reset
     }
   };
 
@@ -355,7 +356,7 @@ export function useAuth() {
   };
 }
 
-// NOTE: A real OTP system requires a backend to generate/send/verify codes.
-// The current 'verifyAdminOtp' is a placeholder simulation.
-// Email verification flow is added, users need to click the link in their email.
-// WARNING: Checking email for admin role is insecure. Use custom claims or a backend role system.
+// NOTE: The admin check now relies on Firebase Custom Claims.
+// You need to set the 'admin: true' custom claim on the admin user's account
+// (e.g., using Firebase Functions or the Firebase Admin SDK in a secure environment).
+// The OTP verification remains a simulation and is insecure.

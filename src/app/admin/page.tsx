@@ -15,30 +15,29 @@ export default function AdminDashboardPage() {
   const { user, isAdmin, logout, isLoading } = useAuth();
   const { toast } = useToast();
 
-  // Protect the route - Redirect if not admin or not logged in
-   React.useEffect(() => {
-       // Wait for loading to finish before checking auth state
-       if (!isLoading) {
-           if (!user || !isAdmin) {
-               toast({
-                   title: "Access Denied",
-                   description: "You do not have permission to access the admin dashboard.",
-                   variant: "destructive"
-               });
-               router.replace('/login'); // Redirect non-admins to login
-           }
-       }
-   }, [user, isAdmin, isLoading, router, toast]);
+  React.useEffect(() => {
+    if (!isLoading && !isAdmin) {
+      toast({
+        title: "Access Denied",
+        description: "You do not have permission to access the admin dashboard.",
+        variant: "destructive",
+      });
+      router.replace('/login');
+    }
+  }, [user, isAdmin, isLoading, router, toast]);
 
-
-  // Show loading state while checking auth
-   if (isLoading || !user || !isAdmin) {
+  if (isLoading || !user) {
     return (
+      
       <div className="flex min-h-[calc(100vh-10rem)] items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
   }
+
+    if (!isAdmin) {
+        return null
+    }
 
   // Render dashboard content if admin is logged in
   return (
