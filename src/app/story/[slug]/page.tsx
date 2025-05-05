@@ -26,7 +26,7 @@ interface Author {
     avatarUrl?: string; // Optional avatar URL
 }
 
-export interface Story extends Omit&lt;BaseStory, 'author'&gt; {
+export interface Story extends Omit<BaseStory, 'author'> {
     author: Author;
 }
 
@@ -59,7 +59,7 @@ interface StoryPageProps {
   };
 }
 
-const StoryDetailPage: NextPage&lt;StoryPageProps&gt; = ({ params }) => {
+const StoryDetailPage: NextPage<StoryPageProps> = ({ params }) => {
   const { user, isLoading: authLoading } = useAuth();
   const { toast } = useToast();
   const [story, setStory] = useState&lt;StoryDetails | null&gt;(null);
@@ -70,7 +70,7 @@ const StoryDetailPage: NextPage&lt;StoryPageProps&gt; = ({ params }) => {
   const [isSubmittingComment, setIsSubmittingComment] = useState(false);
   const [isSubmittingRating, setIsSubmittingRating] = useState(false);
   const [isTogglingLibrary, setIsTogglingLibrary] = useState(false);
-  const [comments, setComments] = useState&lt;StoryCommentData[]&gt;([]);
+  const [comments, setComments] = useState<StoryCommentData[]>([]);
 
   useEffect(() => {
     const fetchStory = async () => {
