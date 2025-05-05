@@ -1,4 +1,3 @@
-
 "use client";
 
 
@@ -18,6 +17,8 @@ import { Textarea } from '@/components/ui/textarea'; // Import Textarea
 import { useToast } from '@/hooks/use-toast'; // Import useToast
 import { validateCommentData, validateRatingData } from '@/services/validationService'; // Import validation functions
 import { fetchStoryDetails, submitStoryComment, submitStoryRating, toggleLibraryStatus } from '@/lib/storyService'; // Import story-specific services
+import type { Timestamp } from 'firebase/firestore'; // Import Timestamp type
+
 
 // Re-type BaseStory author to be an object
 interface Author {
@@ -62,7 +63,7 @@ interface StoryPageProps {
 const StoryDetailPage: NextPage<StoryPageProps> = ({ params }) => {
   const { user, isLoading: authLoading } = useAuth();
   const { toast } = useToast();
-  const [story, setStory] = useState&lt;StoryDetails | null&gt;(null);
+  const [story, setStory] = useState<StoryDetails | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [commentText, setCommentText] = useState('');
   const [rating, setRating] = useState(0); // User's overall story rating selection
@@ -198,24 +199,24 @@ const StoryDetailPage: NextPage<StoryPageProps> = ({ params }) => {
   };
 
   if (isLoading || authLoading) {
-    return &lt;div className="flex items-center justify-center min-h-screen"&gt;&lt;Loader2 className="h-8 w-8 animate-spin text-primary" /&gt;&lt;/div&gt;;
+    return <div className="flex items-center justify-center min-h-screen"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
   }
 
   if (!story) {
-    return &lt;div className="text-center py-20"&gt;Story not found.&lt;/div&gt;;
+    return <div className="text-center py-20">Story not found.</div>;
   }
 
   const displayRating = story.averageRating ? story.averageRating.toFixed(1) : 'N/A';
   const fullStars = Math.floor(story.averageRating || 0);
-  const hasHalfStar = (story.averageRating || 0) % 1 &gt;= 0.5;
+  const hasHalfStar = (story.averageRating || 0) % 1 >= 0.5;
 
   return (
-    &lt;div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12"&gt;
-      &lt;div className="lg:col-span-4 xl:col-span-3 space-y-6"&gt;
-        &lt;div className="sticky top-20 space-y-6"&gt;
-          &lt;Card className="overflow-hidden shadow-lg border border-border/80"&gt;
-            &lt;div className="relative aspect-[2/3] w-full"&gt;
-              &lt;Image
+    <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12">
+      <div className="lg:col-span-4 xl:col-span-3 space-y-6">
+        <div className="sticky top-20 space-y-6">
+          <Card className="overflow-hidden shadow-lg border border-border/80">
+            <div className="relative aspect-[2/3] w-full">
+              <Image
                 src={story.coverImageUrl || `https://picsum.photos/seed/${story.slug}/400/600`} // Fallback image
                 alt={`Cover for ${story.title}`}
                 fill
@@ -223,135 +224,135 @@ const StoryDetailPage: NextPage<StoryPageProps> = ({ params }) => {
                 className="object-cover"
                 priority // Prioritize loading cover image
                 data-ai-hint={story.dataAiHint || "book cover story detail"}
-              /&gt;
-            &lt;/div&gt;
-          &lt;/Card&gt;
+              />
+            </div>
+          </Card>
 
-          &lt;div className="flex flex-col gap-3"&gt;
-            &lt;Button size="lg" asChild className="w-full bg-primary text-primary-foreground hover:bg-primary/90 text-base font-semibold"&gt;
-              &lt;Link href={`/read/${story.slug}/1`}&gt;
-                &lt;BookOpen className="mr-2 h-5 w-5" /&gt; Read First Chapter
-              &lt;/Link&gt;
-            &lt;/Button&gt;
-            &lt;Button
+          <div className="flex flex-col gap-3">
+            <Button size="lg" asChild className="w-full bg-primary text-primary-foreground hover:bg-primary/90 text-base font-semibold">
+              <Link href={`/read/${story.slug}/1`}>
+                <BookOpen className="mr-2 h-5 w-5" /> Read First Chapter
+              </Link>
+            </Button>
+            <Button
               variant={isInLibrary ? "secondary" : "outline"}
               size="lg"
               className="w-full text-base font-semibold"
               onClick={handleToggleLibrary}
               disabled={!user || isTogglingLibrary}
-            &gt;
+            >
               {isTogglingLibrary ? (
-                  &lt;Loader2 className="mr-2 h-5 w-5 animate-spin"/&gt;
+                  <Loader2 className="mr-2 h-5 w-5 animate-spin"/>
               ) : isInLibrary ? (
-                &lt;&gt;
-                  &lt;CheckCircle className="mr-2 h-5 w-5 text-green-600" /&gt; In Your Library
-                &lt;/>
+                <>
+                  <CheckCircle className="mr-2 h-5 w-5 text-green-600" /> In Your Library
+                </>
               ) : (
-                &lt;&gt;
-                  &lt;PlusCircle className="mr-2 h-5 w-5" /&gt; Add to Library
-                &lt;/>
+                <>
+                  <PlusCircle className="mr-2 h-5 w-5" /> Add to Library
+                </>
               )}
-              {!user &amp;&amp; &lt;span className="text-xs ml-2"&gt;(Log in)&lt;/span&gt;}
-            &lt;/Button&gt;
-          &lt;/div&gt;
+              {!user && <span className="text-xs ml-2">(Log in)</span>}
+            </Button>
+          </div>
 
-          &lt;Card className="border border-border/80"&gt;
-            &lt;CardContent className="p-4 space-y-3 text-sm"&gt;
-              &lt;div className="flex items-center justify-between"&gt;
-                &lt;span className="text-muted-foreground font-medium flex items-center gap-2"&gt;&lt;Eye className="w-4 h-4" /&gt; Reads&lt;/span&gt;
-                &lt;span className="font-bold"&gt;{story.reads?.toLocaleString() || 0}&lt;/span&gt;
-              &lt;/div&gt;
-              &lt;Separator /&gt;
-              &lt;div className="flex items-center justify-between"&gt;
-                &lt;span className="text-muted-foreground font-medium flex items-center gap-2"&gt;&lt;ThumbsUp className="w-4 h-4" /&gt; Votes&lt;/span&gt;
-                &lt;span className="font-bold"&gt;{story.totalRatings?.toLocaleString() || 0}&lt;/span&gt;
-              &lt;/div&gt;
-              &lt;Separator /&gt;
-              &lt;div className="flex items-center justify-between"&gt;
-                &lt;span className="text-muted-foreground font-medium flex items-center gap-2"&gt;&lt;List className="w-4 h-4" /&gt; Parts&lt;/span&gt;
-                &lt;span className="font-bold"&gt;{story.chapters}&lt;/span&gt;
-              &lt;/div&gt;
-              &lt;Separator /&gt;
-              &lt;div className="flex items-center justify-between"&gt;
-                &lt;span className="text-muted-foreground font-medium flex items-center gap-2"&gt;&lt;Star className="w-4 h-4" /&gt; Rating&lt;/span&gt;
-                &lt;div className="flex items-center gap-1"&gt;
-                  &lt;span className="font-bold"&gt;{displayRating}&lt;/span&gt;
+          <Card className="border border-border/80">
+            <CardContent className="p-4 space-y-3 text-sm">
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground font-medium flex items-center gap-2"><Eye className="w-4 h-4" /> Reads</span>
+                <span className="font-bold">{story.reads?.toLocaleString() || 0}</span>
+              </div>
+              <Separator />
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground font-medium flex items-center gap-2"><ThumbsUp className="w-4 h-4" /> Votes</span>
+                <span className="font-bold">{story.totalRatings?.toLocaleString() || 0}</span>
+              </div>
+              <Separator />
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground font-medium flex items-center gap-2"><List className="w-4 h-4" /> Parts</span>
+                <span className="font-bold">{story.chapters}</span>
+              </div>
+              <Separator />
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground font-medium flex items-center gap-2"><Star className="w-4 h-4" /> Rating</span>
+                <div className="flex items-center gap-1">
+                  <span className="font-bold">{displayRating}</span>
                    {/* Display star icons based on average rating */}
-                   {story.averageRating &amp;&amp; (
-                      &lt;div className="flex"&gt;
+                   {story.averageRating && (
+                      <div className="flex">
                           {[...Array(5)].map((_, i) => (
-                              &lt;Star key={i} className={`h-4 w-4 ${
-                                  i &lt; fullStars ? 'text-primary fill-primary' :
-                                  i === fullStars &amp;&amp; hasHalfStar ? 'text-primary fill-primary/50' :
+                              <Star key={i} className={`h-4 w-4 ${
+                                  i < fullStars ? 'text-primary fill-primary' :
+                                  i === fullStars && hasHalfStar ? 'text-primary fill-primary/50' :
                                   'text-muted-foreground/30'
-                              }`}/&gt;
+                              }`}/>
                           ))}
-                      &lt;/div&gt;
+                      </div>
                    )}
-                   &lt;span className="text-xs text-muted-foreground"&gt;({story.totalRatings || 0})&lt;/span&gt;
-                &lt;/div&gt;
-              &lt;/div&gt;
-              &lt;Separator /&gt;
-              &lt;div className="flex items-center justify-between"&gt;
-                &lt;span className="text-muted-foreground font-medium"&gt;Status&lt;/span&gt;
-                &lt;Badge variant={story.status === 'Completed' ? "secondary" : "outline"} className={story.status === 'Completed' ? "text-green-700 border-green-300 bg-green-50" : "text-blue-700 border-blue-300 bg-blue-50"}&gt;
+                   <span className="text-xs text-muted-foreground">({story.totalRatings || 0})</span>
+                </div>
+              </div>
+              <Separator />
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground font-medium">Status</span>
+                <Badge variant={story.status === 'Completed' ? "secondary" : "outline"} className={story.status === 'Completed' ? "text-green-700 border-green-300 bg-green-50" : "text-blue-700 border-blue-300 bg-blue-50"}>
                   {story.status}
-                &lt;/Badge&gt;
-              &lt;/div&gt;
-              &lt;Separator /&gt;
-              &lt;div className="flex items-center justify-between"&gt;
-                &lt;span className="text-muted-foreground font-medium"&gt;Updated&lt;/span&gt;
-                &lt;span className="font-semibold"&gt;{new Date(story.lastUpdated).toLocaleDateString()}&lt;/span&gt;
-              &lt;/div&gt;
-            &lt;/CardContent&gt;
-          &lt;/Card&gt;
+                </Badge>
+              </div>
+              <Separator />
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground font-medium">Updated</span>
+                <span className="font-semibold">{new Date(story.lastUpdated).toLocaleDateString()}</span>
+              </div>
+            </CardContent>
+          </Card>
 
-          {story.tags &amp;&amp; story.tags.length &gt; 0 &amp;&amp; (
-            &lt;Card className="border border-border/80"&gt;
-              &lt;CardHeader className="p-4 pb-2"&gt;
-                &lt;CardTitle className="text-base font-semibold"&gt;Tags&lt;/CardTitle&gt;
-              &lt;/CardHeader&gt;
-              &lt;CardContent className="p-4 pt-0"&gt;
-                &lt;div className="flex flex-wrap gap-2"&gt;
+          {story.tags && story.tags.length > 0 && (
+            <Card className="border border-border/80">
+              <CardHeader className="p-4 pb-2">
+                <CardTitle className="text-base font-semibold">Tags</CardTitle>
+              </CardHeader>
+              <CardContent className="p-4 pt-0">
+                <div className="flex flex-wrap gap-2">
                   {story.tags.map(tag => (
-                    &lt;Link key={tag} href={`/browse?tags=${encodeURIComponent(tag)}`}&gt;
-                      &lt;Badge variant="secondary" className="cursor-pointer hover:bg-accent hover:text-accent-foreground transition-colors"&gt;
+                    <Link key={tag} href={`/browse?tags=${encodeURIComponent(tag)}`}>
+                      <Badge variant="secondary" className="cursor-pointer hover:bg-accent hover:text-accent-foreground transition-colors">
                         #{tag.toLowerCase()}
-                      &lt;/Badge&gt;
-                    &lt;/Link&gt;
+                      </Badge>
+                    </Link>
                   ))}
-                &lt;/div&gt;
-              &lt;/CardContent&gt;
-            &lt;/Card&gt;
+                </div>
+              </CardContent>
+            </Card>
           )}
-          &lt;Button variant="outline" className="w-full" onClick={handleShareStory}&gt;
-            &lt;Share2 className="mr-2 h-4 w-4" /&gt; Share Story
-          &lt;/Button&gt;
-        &lt;/div&gt;
-      &lt;/div&gt;
+          <Button variant="outline" className="w-full" onClick={handleShareStory}>
+            <Share2 className="mr-2 h-4 w-4" /> Share Story
+          </Button>
+        </div>
+      </div>
 
-      &lt;div className="lg:col-span-8 xl:col-span-9 space-y-8"&gt;
-        &lt;div className="space-y-3"&gt;
-          &lt;h1 className="text-3xl md:text-4xl font-bold leading-tight text-foreground"&gt;{story.title}&lt;/h1&gt;
-          &lt;div className="flex items-center gap-3"&gt;
-            &lt;Link href={`/user/${story.author.id}`} className="flex items-center gap-3 group"&gt;
-              &lt;Avatar className="h-11 w-11 border-2 border-border group-hover:border-primary transition-colors"&gt;
-                &lt;AvatarImage src={story.author.avatarUrl || `https://picsum.photos/seed/${story.author.name}/100/100`} alt={story.author.name} data-ai-hint="author profile picture large" /&gt;
-                &lt;AvatarFallback&gt;{story.author.name.substring(0, 1).toUpperCase()}&lt;/AvatarFallback&gt;
-              &lt;/Avatar&gt;
-              &lt;div&gt;
-                &lt;p className="font-semibold text-lg group-hover:text-primary transition-colors"&gt;{story.author.name}&lt;/p&gt;
-                &lt;p className="text-sm text-muted-foreground"&gt;{story.authorFollowers.toLocaleString()} Followers&lt;/p&gt;
-              &lt;/div&gt;
-            &lt;/Link&gt;
-            {user &amp;&amp; user.id !== story.author.id &amp;&amp; (
-              &lt;Button variant="outline" size="sm" className="ml-4" disabled&gt;Follow&lt;/Button&gt; // Follow button disabled for now
+      <div className="lg:col-span-8 xl:col-span-9 space-y-8">
+        <div className="space-y-3">
+          <h1 className="text-3xl md:text-4xl font-bold leading-tight text-foreground">{story.title}</h1>
+          <div className="flex items-center gap-3">
+            <Link href={`/user/${story.author.id}`} className="flex items-center gap-3 group">
+              <Avatar className="h-11 w-11 border-2 border-border group-hover:border-primary transition-colors">
+                <AvatarImage src={story.author.avatarUrl || `https://picsum.photos/seed/${story.author.name}/100/100`} alt={story.author.name} data-ai-hint="author profile picture large" />
+                <AvatarFallback>{story.author.name.substring(0, 1).toUpperCase()}</AvatarFallback>
+              </Avatar>
+              <div>
+                <p className="font-semibold text-lg group-hover:text-primary transition-colors">{story.author.name}</p>
+                <p className="text-sm text-muted-foreground">{story.authorFollowers.toLocaleString()} Followers</p>
+              </div>
+            </Link>
+            {user && user.id !== story.author.id && (
+              <Button variant="outline" size="sm" className="ml-4" disabled>Follow</Button> // Follow button disabled for now
             )}
-          &lt;/div&gt;
-          &lt;div className="flex items-center gap-2 pt-2"&gt;
-            &lt;span className="text-sm font-medium text-muted-foreground"&gt;Your Rating:&lt;/span&gt;
+          </div>
+          <div className="flex items-center gap-2 pt-2">
+            <span className="text-sm font-medium text-muted-foreground">Your Rating:</span>
             {[1, 2, 3, 4, 5].map((star) => (
-              &lt;Button
+              <Button
                 key={star}
                 variant="ghost"
                 size="icon"
@@ -359,108 +360,108 @@ const StoryDetailPage: NextPage<StoryPageProps> = ({ params }) => {
                 disabled={!user || isSubmittingRating}
                 className={`h-7 w-7 p-0 ${!user ? 'cursor-not-allowed opacity-50' : ''}`}
                 aria-label={`Rate story ${star} stars`}
-              &gt;
-                &lt;Star
-                  className={`h-5 w-5 transition-colors ${star &lt;= rating ? 'fill-primary text-primary' : 'text-muted-foreground/50'} ${user ? 'hover:text-primary/80' : ''}`}
-                /&gt;
-              &lt;/Button&gt;
+              >
+                <Star
+                  className={`h-5 w-5 transition-colors ${star <= rating ? 'fill-primary text-primary' : 'text-muted-foreground/50'} ${user ? 'hover:text-primary/80' : ''}`}
+                />
+              </Button>
             ))}
-            {isSubmittingRating &amp;&amp; &lt;Loader2 className="h-4 w-4 animate-spin text-muted-foreground ml-1" /&gt;}
-            {!user &amp;&amp; &lt;Link href="/login" className="text-xs text-primary underline ml-1"&gt;Log in to rate&lt;/Link&gt;}
-          &lt;/div&gt;
-        &lt;/div&gt;
+            {isSubmittingRating && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground ml-1" />}
+            {!user && <Link href="/login" className="text-xs text-primary underline ml-1">Log in to rate</Link>}
+          </div>
+        </div>
 
-        &lt;Card className="border border-border/80 shadow-sm"&gt;
-          &lt;CardContent className="p-5"&gt;
-            &lt;p className="text-base md:text-lg leading-relaxed whitespace-pre-line text-foreground/90"&gt;{story.description}&lt;/p&gt;
-          &lt;/CardContent&gt;
-        &lt;/Card&gt;
+        <Card className="border border-border/80 shadow-sm">
+          <CardContent className="p-5">
+            <p className="text-base md:text-lg leading-relaxed whitespace-pre-line text-foreground/90">{story.description}</p>
+          </CardContent>
+        </Card>
 
-        &lt;Card id="chapters" className="border border-border/80 shadow-sm scroll-mt-20"&gt;
-          &lt;CardHeader className="border-b border-border/80"&gt;
-            &lt;CardTitle className="flex items-center gap-2 text-xl font-semibold"&gt;
-              &lt;List className="w-5 h-5" /&gt; Table of Contents ({story.chaptersData.length} Parts)
-            &lt;/CardTitle&gt;
-          &lt;/CardHeader&gt;
-          &lt;CardContent className="p-0"&gt;
-            &lt;ul className="divide-y divide-border/60"&gt;
+        <Card id="chapters" className="border border-border/80 shadow-sm scroll-mt-20">
+          <CardHeader className="border-b border-border/80">
+            <CardTitle className="flex items-center gap-2 text-xl font-semibold">
+              <List className="w-5 h-5" /> Table of Contents ({story.chaptersData.length} Parts)
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
+            <ul className="divide-y divide-border/60">
               {story.chaptersData.map((chapter) => (
-                &lt;li key={chapter.id}&gt;
-                  &lt;Link href={`/read/${story.slug}/${chapter.order}`} className="flex justify-between items-center p-4 hover:bg-secondary transition-colors duration-150 group"&gt;
-                    &lt;span className="font-medium group-hover:text-primary"&gt;{chapter.order}. {chapter.title}&lt;/span&gt;
-                    &lt;span className="text-sm text-muted-foreground"&gt;&lt;/span&gt;
-                  &lt;/Link&gt;
-                &lt;/li&gt;
+                <li key={chapter.id}>
+                  <Link href={`/read/${story.slug}/${chapter.order}`} className="flex justify-between items-center p-4 hover:bg-secondary transition-colors duration-150 group">
+                    <span className="font-medium group-hover:text-primary">{chapter.order}. {chapter.title}</span>
+                    <span className="text-sm text-muted-foreground"></span>
+                  </Link>
+                </li>
               ))}
-            &lt;/ul&gt;
-          &lt;/CardContent&gt;
-        &lt;/Card&gt;
+            </ul>
+          </CardContent>
+        </Card>
 
-        &lt;Card className="border border-border/80 shadow-sm"&gt;
-          &lt;CardHeader className="border-b border-border/80"&gt;
-            &lt;CardTitle className="flex items-center gap-2 text-xl font-semibold"&gt;
-              &lt;MessageSquare className="w-5 h-5" /&gt; Comments ({comments.length})
-            &lt;/CardTitle&gt;
-          &lt;/CardHeader&gt;
-          &lt;CardContent className="p-5 space-y-6"&gt;
+        <Card className="border border-border/80 shadow-sm">
+          <CardHeader className="border-b border-border/80">
+            <CardTitle className="flex items-center gap-2 text-xl font-semibold">
+              <MessageSquare className="w-5 h-5" /> Comments ({comments.length})
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-5 space-y-6">
             {user ? (
-              &lt;div className="flex gap-3 items-start"&gt;
-                &lt;Avatar className="mt-1"&gt;
-                  &lt;AvatarImage src={user.avatarUrl || undefined} alt={user.name || 'User'} data-ai-hint="user avatar comment" /&gt;
-                  &lt;AvatarFallback&gt;{user.name?.substring(0, 1).toUpperCase() || 'U'}&lt;/AvatarFallback&gt;
-                &lt;/Avatar&gt;
-                &lt;div className="flex-1 space-y-2"&gt;
-                  &lt;Textarea
+              <div className="flex gap-3 items-start">
+                <Avatar className="mt-1">
+                  <AvatarImage src={user.avatarUrl || undefined} alt={user.name || 'User'} data-ai-hint="user avatar comment" />
+                  <AvatarFallback>{user.name?.substring(0, 1).toUpperCase() || 'U'}</AvatarFallback>
+                </Avatar>
+                <div className="flex-1 space-y-2">
+                  <Textarea
                     placeholder="Add a comment about the story..."
                     value={commentText}
                     onChange={(e) => setCommentText(e.target.value)}
                     rows={3}
                     className="w-full"
                     disabled={isSubmittingComment}
-                  /&gt;
-                  &lt;Button onClick={handleCommentSubmit} size="sm" disabled={commentText.trim() === '' || isSubmittingComment}&gt;
-                    {isSubmittingComment ? &lt;Loader2 className="h-4 w-4 mr-1 animate-spin"/&gt; : &lt;Send className="h-4 w-4 mr-1" /&gt;} Post Comment
-                  &lt;/Button&gt;
-                &lt;/div&gt;
-              &lt;/div&gt;
+                  />
+                  <Button onClick={handleCommentSubmit} size="sm" disabled={commentText.trim() === '' || isSubmittingComment}>
+                    {isSubmittingComment ? <Loader2 className="h-4 w-4 mr-1 animate-spin"/> : <Send className="h-4 w-4 mr-1" />} Post Comment
+                  </Button>
+                </div>
+              </div>
             ) : (
-              &lt;div className="text-center p-4 border border-dashed rounded-md"&gt;
-                &lt;p className="text-muted-foreground"&gt;
-                  &lt;Link href="/login" className="text-primary font-medium underline"&gt;Log in&lt;/Link&gt; or&lt;{' '}/&gt;
-                  &lt;Link href="/signup" className="text-primary font-medium underline"&gt;Sign up&lt;/Link&gt; to leave a comment.
-                &lt;/p&gt;
-              &lt;/div&gt;
+              <div className="text-center p-4 border border-dashed rounded-md">
+                <p className="text-muted-foreground">
+                  <Link href="/login" className="text-primary font-medium underline">Log in</Link> or{' '}
+                  <Link href="/signup" className="text-primary font-medium underline">Sign up</Link> to leave a comment.
+                </p>
+              </div>
             )}
-            &lt;div className="space-y-4 pt-4"&gt;
-                {comments.length === 0 &amp;&amp; (
-                     &lt;p className="text-center text-sm text-muted-foreground italic"&gt;No story comments yet.&lt;/p&gt;
+            <div className="space-y-4 pt-4">
+                {comments.length === 0 && (
+                     <p className="text-center text-sm text-muted-foreground italic">No story comments yet.</p>
                  )}
               {comments.map((comment) => (
-                &lt;div key={comment.id} className="flex gap-3 items-start"&gt;
-                  &lt;Avatar className="h-9 w-9"&gt;
-                    &lt;AvatarImage src={comment.userAvatar || undefined} alt={comment.userName || 'User'} data-ai-hint="commenter avatar" /&gt;
-                    &lt;AvatarFallback&gt;{comment.userName?.substring(0, 1).toUpperCase() || 'U'}&lt;/AvatarFallback&gt;
-                  &lt;/Avatar&gt;
-                  &lt;div className="p-3 rounded-md bg-background border w-full"&gt;
-                    &lt;p className="font-semibold text-sm"&gt;{comment.userName}&lt;/p&gt;
-                    &lt;p className="text-sm text-foreground/80 mt-1 whitespace-pre-line"&gt;{comment.text}&lt;/p&gt;
-                    &lt;p className="text-xs text-muted-foreground mt-2"&gt;{new Date(comment.timestamp).toLocaleString()}&lt;/p&gt;
-                  &lt;/div&gt;
-                &lt;/div&gt;
+                <div key={comment.id} className="flex gap-3 items-start">
+                  <Avatar className="h-9 w-9">
+                    <AvatarImage src={comment.userAvatar || undefined} alt={comment.userName || 'User'} data-ai-hint="commenter avatar" />
+                    <AvatarFallback>{comment.userName?.substring(0, 1).toUpperCase() || 'U'}</AvatarFallback>
+                  </Avatar>
+                  <div className="p-3 rounded-md bg-background border w-full">
+                    <p className="font-semibold text-sm">{comment.userName}</p>
+                    <p className="text-sm text-foreground/80 mt-1 whitespace-pre-line">{comment.text}</p>
+                    <p className="text-xs text-muted-foreground mt-2">{new Date(comment.timestamp).toLocaleString()}</p>
+                  </div>
+                </div>
               ))}
-            &lt;/div&gt;
-          &lt;/CardContent&gt;
-        &lt;/Card&gt;
-      &lt;/div&gt;
-    &lt;/div&gt;
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
   );
 };
 
 // Wrap with Suspense for client components that might use hooks like useSearchParams
-const SuspendedStoryDetailPage: NextPage&lt;StoryPageProps&gt; = (props) => (
-  &lt;Suspense fallback=&lt;div className="flex items-center justify-center min-h-[calc(100vh-10rem)]"&gt;&lt;Loader2 className="h-8 w-8 animate-spin text-primary" /&gt;&lt;/div&gt;&gt;
-    &lt;StoryDetailPage {...props} /&gt;
-  &lt;/Suspense&gt;
+const SuspendedStoryDetailPage: NextPage<StoryPageProps> = (props) => (
+  <Suspense fallback={<div className="flex items-center justify-center min-h-[calc(100vh-10rem)]"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>}>
+    <StoryDetailPage {...props} />
+  </Suspense>
 );
 
 
