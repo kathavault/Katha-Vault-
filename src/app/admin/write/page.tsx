@@ -51,30 +51,33 @@ export default function AdminWritePage() {
   // Fetch stories for the admin user on mount
   React.useEffect(() => {
     const loadStories = async () => {
-      if (user?.id) {
+      if (user?.id && isAdmin) { // Only fetch if logged-in user is admin
         setIsLoadingStories(true);
         try {
-          const fetchedStories = await fetchAdminStories(user.id); // Fetch stories associated with admin (adjust if needed)
+          // Assuming fetchAdminStories is appropriate for fetching all stories managed by admins
+          const fetchedStories = await fetchAdminStories(user.id);
           setStories(fetchedStories);
         } catch (error) {
           console.error("Error fetching admin stories:", error);
           toast({
             title: "Error Fetching Stories",
-            description: "Could not load your stories. Please try again.",
+            description: "Could not load stories. Please try again.",
             variant: "destructive",
           });
         } finally {
           setIsLoadingStories(false);
         }
       } else if (!authLoading) {
-          // If auth is loaded but no user, clear stories and stop loading
+          // If auth is loaded but no user or not admin, clear stories and stop loading
           setStories([]);
           setIsLoadingStories(false);
       }
     };
 
-    loadStories();
-  }, [user, authLoading, toast]);
+    if (!authLoading) { // Only run when auth state is resolved
+        loadStories();
+    }
+  }, [user, isAdmin, authLoading, toast]);
 
 
   // Protect the route
@@ -164,8 +167,8 @@ export default function AdminWritePage() {
   };
 
   const handleSaveStory = async () => {
-    if (!user?.id) {
-        toast({ title: "Authentication Error", description: "User not found.", variant: "destructive"});
+    if (!user?.id || !isAdmin) { // Ensure user is admin
+        toast({ title: "Authorization Error", description: "Only admins can save stories.", variant: "destructive"});
         return;
     }
     setIsSaving(true);
@@ -178,10 +181,10 @@ export default function AdminWritePage() {
         status: storyStatus,
         authorId: user.id, // Associate story with logged-in admin
         authorName: user.name || user.email || 'Admin', // Add author name
-        coverImageUrl: selectedStory?.coverImageUrl || '', // Keep existing or default
-        // chapters field is managed separately or within the Story type if needed
+        // Note: coverImageUrl and chapters are handled separately or implicitly
     };
 
+    // Server-side validation
     const validationError = validateStoryData(storyData);
     if (validationError) {
         toast({ title: "Validation Error", description: validationError, variant: "destructive" });
@@ -190,25 +193,40 @@ export default function AdminWritePage() {
     }
 
     try {
-        const savedStoryId = await saveStory(selectedStory?.id, storyData); // Pass existing ID if editing
-        const savedStory: Story = {
-            ...storyData,
-            id: savedStoryId,
-            chapters: selectedStory?.chapters || [], // Preserve chapters locally for now
-            reads: selectedStory?.reads || 0, // Preserve reads
+        // Pass necessary fields explicitly, omit fields managed by Firestore (like reads, potentially chapters depending on structure)
+        const dataToSave: Omit&lt;Story, 'id' | 'chapters' | 'reads' | 'lastUpdated' | 'coverImageUrl'&gt; &amp; { authorId: string } = {
+            title: storyData.title,
+            description: storyData.description,
+            genre: storyData.genre,
+            tags: storyData.tags,
+            status: storyData.status,
+            authorId: storyData.authorId,
+            authorName: storyData.authorName,
         };
 
-        toast({ title: "Story Saved", description: `Story "${savedStory.title}" has been saved.` });
+        const savedStoryId = await saveStory(selectedStory?.id, dataToSave); // Pass existing ID if editing
+        const storySnapshot = stories.find(s => s.id === selectedStory?.id) || { chapters: [], reads: 0 }; // Get existing data or default
+
+        const savedOrUpdatedStory: Story = {
+            ...dataToSave,
+            id: savedStoryId,
+            chapters: storySnapshot.chapters, // Preserve chapters locally
+            reads: storySnapshot.reads, // Preserve reads
+            coverImageUrl: selectedStory?.coverImageUrl, // Keep existing URL
+            lastUpdated: new Date(), // Update timestamp locally (Firestore handles server time)
+        };
+
+        toast({ title: "Story Saved", description: `Story "${savedOrUpdatedStory.title}" has been saved.` });
 
         // Update local state
         if (isCreatingNewStory) {
-            setStories(prev => [...prev, savedStory]);
-            setSelectedStory(savedStory);
+            setStories(prev => [...prev, savedOrUpdatedStory]);
+            setSelectedStory(savedOrUpdatedStory);
             setIsCreatingNewStory(false);
         } else {
-            setStories(prev => prev.map(s => s.id === savedStory.id ? savedStory : s));
-             // Update selected story details in state if it's the one being edited
-             setSelectedStory(prev => prev && prev.id === savedStory.id ? savedStory : prev);
+            setStories(prev => prev.map(s => s.id === savedOrUpdatedStory.id ? savedOrUpdatedStory : s));
+            // Update selected story details in state if it's the one being edited
+            setSelectedStory(prev => prev && prev.id === savedOrUpdatedStory.id ? savedOrUpdatedStory : prev);
         }
     } catch (error) {
         console.error("Error saving story:", error);
@@ -219,8 +237,8 @@ export default function AdminWritePage() {
   };
 
   const handleSaveChapter = async () => {
-    if (!selectedStory?.id || !user?.id) {
-      toast({ title: "Cannot Save Chapter", description: "No story selected or user not found.", variant: "destructive" });
+    if (!selectedStory?.id || !user?.id || !isAdmin) { // Ensure user is admin
+      toast({ title: "Cannot Save Chapter", description: "No story selected or insufficient permissions.", variant: "destructive" });
       return;
     }
     setIsSaving(true);
@@ -228,10 +246,12 @@ export default function AdminWritePage() {
         title: chapterTitle,
         content: chapterContent,
         storyId: selectedStory.id,
-        // Calculate word count on save
         wordCount: chapterContent.split(/\s+/).filter(Boolean).length,
+        // order field will be handled by saveChapter function if creating new
+        order: selectedChapter?.order // Pass existing order if editing
     };
 
+    // Server-side validation
     const validationError = validateChapterData(chapterData);
     if (validationError) {
         toast({ title: "Validation Error", description: validationError, variant: "destructive" });
@@ -240,19 +260,35 @@ export default function AdminWritePage() {
     }
 
     try {
-        const savedChapterId = await saveChapter(selectedStory.id, selectedChapter?.id, chapterData);
-        const savedChapter: Chapter = { ...chapterData, id: savedChapterId };
+        const dataToSave: Omit&lt;Chapter, 'id' | 'lastUpdated'&gt; = {
+             title: chapterData.title,
+             content: chapterData.content,
+             storyId: chapterData.storyId,
+             wordCount: chapterData.wordCount,
+             order: chapterData.order,
+        };
+
+        const savedChapterId = await saveChapter(selectedStory.id, selectedChapter?.id, dataToSave);
+        const savedChapter: Chapter = {
+             ...dataToSave,
+             id: savedChapterId,
+             lastUpdated: new Date(), // Update timestamp locally
+         };
+
 
         toast({ title: "Chapter Saved", description: `Chapter "${savedChapter.title}" saved.` });
 
         // Update local state
         const updateStoryChapters = (chapters: Chapter[] | undefined) => {
             const existingChapters = chapters || [];
-            if (isCreatingNewChapter) {
-                return [...existingChapters, savedChapter];
+            let updatedChapters: Chapter[];
+            if (isCreatingNewChapter || !selectedChapter) {
+                updatedChapters = [...existingChapters, savedChapter];
             } else {
-                return existingChapters.map(ch => ch.id === savedChapter.id ? savedChapter : ch);
+                updatedChapters = existingChapters.map(ch => ch.id === savedChapter.id ? savedChapter : ch);
             }
+            // Re-sort chapters locally based on order
+            return updatedChapters.sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
         };
 
         setStories(prevStories => prevStories.map(s =>
@@ -272,7 +308,7 @@ export default function AdminWritePage() {
   };
 
   const handleDeleteStory = async () => {
-      if (!selectedStory?.id) return;
+      if (!selectedStory?.id || !isAdmin) return; // Check admin status
       if (window.confirm(`Are you sure you want to delete the story "${selectedStory.title}" and ALL its chapters? This action cannot be undone.`)) {
           setIsDeleting(true);
           try {
@@ -291,7 +327,7 @@ export default function AdminWritePage() {
   };
 
    const handleDeleteChapter = async () => {
-        if (!selectedStory?.id || !selectedChapter?.id) return;
+        if (!selectedStory?.id || !selectedChapter?.id || !isAdmin) return; // Check admin status
         if (window.confirm(`Are you sure you want to delete the chapter "${selectedChapter.title}"? This action cannot be undone.`)) {
             setIsDeleting(true);
             try {
@@ -300,7 +336,9 @@ export default function AdminWritePage() {
 
                  // Update local state
                 const updateStoryChapters = (chapters: Chapter[] | undefined) => {
-                    return (chapters || []).filter(ch => ch.id !== selectedChapter.id);
+                    const updated = (chapters || []).filter(ch => ch.id !== selectedChapter.id);
+                     // Re-sort chapters locally based on order
+                     return updated.sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
                 };
 
                 setStories(prevStories => prevStories.map(s =>
@@ -335,9 +373,9 @@ export default function AdminWritePage() {
 
         <Alert variant="warning" className="mb-6">
              <AlertTriangle className="h-4 w-4" />
-             <AlertTitle>Firestore Interaction</AlertTitle>
+             <AlertTitle>Security Reminder</AlertTitle>
              <AlertDescription>
-                This editor now interacts directly with your Firestore database. Ensure your security rules are properly configured to prevent unauthorized access or modifications.
+                Ensure your Firestore security rules are correctly configured to restrict write access to administrators only. Client-side checks alone are not sufficient.
              </AlertDescription>
          </Alert>
 
@@ -375,7 +413,7 @@ export default function AdminWritePage() {
               )}
             </CardContent>
              {selectedStory && (
-                 <>
+                 &lt;&gt;
                  <Separator />
                   <CardHeader className="pb-3 pt-4">
                      <CardTitle className="text-lg flex items-center justify-between">
@@ -391,7 +429,7 @@ export default function AdminWritePage() {
                      )}
                     {selectedStory.chapters?.map(chapter => (
                       <Card key={chapter.id} className={`p-3 cursor-pointer hover:bg-secondary transition-colors ${selectedChapter?.id === chapter.id ? 'bg-secondary border-primary' : ''}`} onClick={() => handleSelectChapter(chapter.id)}>
-                           <p className="font-medium truncate">{chapter.title}</p>
+                           <p className="font-medium truncate">{chapter.order}. {chapter.title}</p> {/* Display order */}
                            <p className="text-xs text-muted-foreground">{chapter.wordCount || 0} words</p>
                         </Card>
                     ))}
@@ -402,7 +440,7 @@ export default function AdminWritePage() {
                          </Card>
                      )}
                    </CardContent>
-                  </>
+                  &lt;/>
               )}
           </Card>
         </div>
