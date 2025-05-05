@@ -21,6 +21,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'; //
 import { useToast } from '@/hooks/use-toast'; // Import useToast
 import { validateCommentData, validateRatingData } from '@/services/validationService'; // Import validation functions
 import { fetchChapterDetails, submitComment, submitRating } from '@/lib/readerService'; // Import reader-specific services
+import type { Timestamp } from 'firebase/firestore'; // Import Timestamp type
 
 // Define the shape of detailed chapter data fetched from the backend
 interface ChapterDetails {
@@ -37,7 +38,7 @@ interface ChapterDetails {
 }
 
 // Define the shape of a comment
-interface CommentData { 
+interface CommentData {
   id: string;
   userId: string;
   userName: string;
@@ -56,7 +57,7 @@ interface ReadPageProps {
 // Basic content formatting (can be enhanced)
 const formatContent = (text: string): React.ReactNode => {
   const paragraphs = text.trim().split(/\n\s*\n/);
-  return paragraphs.map((p, i) => { 
+  return paragraphs.map((p, i) => {
     let content: string = p;
     content = p.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
     content = content.replace(/\*(.*?)\*/g, '<em>$1</em>');
@@ -70,7 +71,12 @@ const formatContent = (text: string): React.ReactNode => {
 
       </React.Fragment>
     ));
-    return <p key={i} dangerouslySetInnerHTML={{ __html: lines.join('') }}></p>;
+    // Using dangerouslySetInnerHTML is generally safe here if the input `text`
+    // is trusted and comes from your own database/admin editor.
+    // If content can be user-generated and saved directly, sanitize it server-side first.
+    // Join the React elements' children (text nodes, strong, em) into a single string for dangerouslySetInnerHTML
+    const htmlContent = lines.map(line => React.Children.toArray(line.props.children).join('')).join('');
+    return <p key={i} dangerouslySetInnerHTML={{ __html: htmlContent }}></p>;
   });
 };
 
@@ -79,7 +85,7 @@ const ReadingPage: NextPage<ReadPageProps> = ({ params }) => {
   const chapterNumber = parseInt(params.chapter, 10);
   const { user, isLoading: authLoading } = useAuth();
   const { toast } = useToast();
-  const [chapterData, setChapterData] = useState&lt;ChapterDetails | null&gt;(null);
+  const [chapterData, setChapterData] = useState<ChapterDetails | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [commentText, setCommentText] = useState('');
   const [rating, setRating] = useState(0); // User's current rating selection
@@ -151,7 +157,7 @@ const ReadingPage: NextPage<ReadPageProps> = ({ params }) => {
       setCommentText(''); // Clear input
     } catch (error) {
       console.error("Error submitting comment:", error);
-      toast({ title: "Error Posting Comment", description: "Could not post your comment. Please try again.", variant: "destructive" });
+      toast({ title: "Error Posting Comment", description: "Could not post your comment. Please try again later.", variant: "destructive" });
     } finally {
       setIsSubmittingComment(false);
     }
@@ -203,12 +209,12 @@ const ReadingPage: NextPage<ReadPageProps> = ({ params }) => {
 
   if (!chapterData) {
     return (
-        
+
       <div className="text-center py-20 flex flex-col items-center gap-4">
         <p className="text-xl text-destructive">
         </p>
         <p className="text-muted-foreground">
-          {isNaN(chapterNumber) || chapterNumber &lt; 1
+          {isNaN(chapterNumber) || chapterNumber < 1
             ? 'The chapter number specified in the URL is not valid.'
             : "We couldn't find the chapter you were looking for."
           }

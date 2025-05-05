@@ -35,7 +35,7 @@ interface StoryCommentData {
     timestamp: Date;
 }
 
-interface StoryDetailsResult extends Omit&lt;Story, 'author' | 'chapters' | 'lastUpdated'&gt; {
+interface StoryDetailsResult extends Omit<Story, 'author' | 'chapters' | 'lastUpdated'> {
     author: Author; // Use the Author interface
     chaptersData: { id: string; title: string; order: number }[];
     authorFollowers: number; // Example additional data
@@ -63,7 +63,7 @@ interface SubmitStoryRatingParams {
 /**
  * Fetches detailed information for a specific story by its slug.
  */
-export const fetchStoryDetails = async (slug: string, userId?: string | null): Promise&lt;StoryDetailsResult | null&gt; => {
+export const fetchStoryDetails = async (slug: string, userId?: string | null): Promise<StoryDetailsResult | null> => {
     try {
         // 1. Find the story by slug
         const storiesRef = collection(db, "stories");
@@ -81,7 +81,6 @@ export const fetchStoryDetails = async (slug: string, userId?: string | null): P
         // 2. Fetch chapters ordered by 'order' field
         const chaptersRef = collection(db, "stories", storyId, "chapters");
         const chaptersQuery = query(chaptersRef, orderBy("order", "asc"));
-        const chaptersSnapshot = await getDocs(chaptersQuery);
         const chaptersData: { id: string; title: string; order: number }[] = chaptersSnapshot.docs.map(docSnap => ({
             id: docSnap.id,
             title: docSnap.data().title || `Chapter ${docSnap.data().order}`,
@@ -168,7 +167,7 @@ export const fetchStoryDetails = async (slug: string, userId?: string | null): P
 /**
  * Submits a comment for a specific story.
  */
-export const submitStoryComment = async (params: SubmitStoryCommentParams): Promise&lt;{ id: string }&gt; => {
+export const submitStoryComment = async (params: SubmitStoryCommentParams): Promise<{ id: string }> => {
     const { storyId, userId, text } = params;
 
     if (!auth.currentUser || auth.currentUser.uid !== userId) {
@@ -197,13 +196,13 @@ export const submitStoryComment = async (params: SubmitStoryCommentParams): Prom
 /**
  * Submits or updates an overall rating for a specific story.
  */
-export const submitStoryRating = async (params: SubmitStoryRatingParams): Promise&lt;void&gt; => {
+export const submitStoryRating = async (params: SubmitStoryRatingParams): Promise<void> => {
     const { storyId, userId, rating } = params;
 
      if (!auth.currentUser || auth.currentUser.uid !== userId) {
         throw new Error("User is not authenticated or UID mismatch.");
      }
-     if (rating &lt; 1 || rating &gt; 5) {
+     if (rating < 1 || rating > 5) {
          throw new Error("Rating must be between 1 and 5.");
      }
 
@@ -239,7 +238,7 @@ export const submitStoryRating = async (params: SubmitStoryRatingParams): Promis
 /**
  * Adds or removes a story from the user's library.
  */
-export const toggleLibraryStatus = async (userId: string, storyId: string, addToLibrary: boolean): Promise&lt;void&gt; => {
+export const toggleLibraryStatus = async (userId: string, storyId: string, addToLibrary: boolean): Promise<void> => {
     if (!auth.currentUser || auth.currentUser.uid !== userId) {
         throw new Error("User is not authenticated or UID mismatch.");
     }

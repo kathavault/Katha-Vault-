@@ -27,10 +27,6 @@ interface Author {
     avatarUrl?: string; // Optional avatar URL
 }
 
-export interface Story extends Omit<BaseStory, 'author'> {
-    author: Author;
-}
-
 // Define the shape of a comment for story page
 interface StoryCommentData {
     id: string;
@@ -42,16 +38,19 @@ interface StoryCommentData {
 }
 
 // Define extended Story type for this page
-interface StoryDetails extends Story {
-  chaptersData: { id: string; title: string; order: number }[]; // Add order
-  authorFollowers: number;
-  status: 'Ongoing' | 'Completed';
-  lastUpdated: string;
-  averageRating?: number; // Overall story rating
+interface StoryDetails extends Omit<BaseStory, 'author' | 'chapters' | 'lastUpdated'> {
+  id: string; // Ensure StoryDetails also has an id
+  author: Author; // Use the Author interface
+  chaptersData: { id: string; title: string; order: number }[];
+  authorFollowers: number; // Example additional data
+  status: 'Draft' | 'Published' | 'Archived' | 'Ongoing' | 'Completed'; // Use specific status type // Adjusted status type
+  lastUpdated: string; // Keep as string for consistency
+  averageRating?: number;
   totalRatings?: number;
-  comments?: StoryCommentData[]; // Story-level comments
-  userRating?: number; // Current user's overall rating for the story
-  isInLibrary?: boolean; // Whether the story is in the current user's library
+  chapters: number; // Add chapters count
+  comments?: StoryCommentData[];
+  userRating?: number; // User's overall rating for this story
+  isInLibrary?: boolean;
 }
 
 interface StoryPageProps {
@@ -295,7 +294,7 @@ const StoryDetailPage: NextPage<StoryPageProps> = ({ params }) => {
               <Separator />
               <div className="flex items-center justify-between">
                 <span className="text-muted-foreground font-medium">Status</span>
-                <Badge variant={story.status === 'Completed' ? "secondary" : "outline"} className={story.status === 'Completed' ? "text-green-700 border-green-300 bg-green-50" : "text-blue-700 border-blue-300 bg-blue-50"}>
+                 <Badge variant={story.status === 'Completed' ? "secondary" : "outline"} className={story.status === 'Completed' ? "text-green-700 border-green-300 bg-green-50" : (story.status === 'Ongoing' ? "text-blue-700 border-blue-300 bg-blue-50" : "")}>
                   {story.status}
                 </Badge>
               </div>
@@ -466,3 +465,4 @@ const SuspendedStoryDetailPage: NextPage<StoryPageProps> = (props) => (
 
 
 export default SuspendedStoryDetailPage;
+
