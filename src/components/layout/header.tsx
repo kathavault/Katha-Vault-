@@ -18,6 +18,7 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast'; // Import useToast
+import { ThemeToggle } from '@/components/layout/theme-toggle'; // Import ThemeToggle
 
 const Header: FC = () => {
   const { user, isAdmin, logout, isLoading } = useAuth(); // Use the simulated auth hook
@@ -143,6 +144,9 @@ const Header: FC = () => {
                       </Button>
                      </div>
                    )}
+                   <div className="flex justify-center mt-4">
+                     <ThemeToggle />
+                   </div>
                </div>
              </nav>
           </SheetContent>
@@ -201,6 +205,7 @@ const Header: FC = () => {
 
         {/* Right Section - Actions */}
         <div className="flex items-center gap-2 shrink-0">
+           <ThemeToggle /> {/* Add ThemeToggle here */}
            {isLoading ? (
                 <Loader2 className="h-6 w-6 animate-spin text-primary" />
            ) : user ? (
