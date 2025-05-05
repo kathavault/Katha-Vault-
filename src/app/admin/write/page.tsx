@@ -4,7 +4,7 @@
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/use-auth';
-import { Loader2, ShieldCheck, FileText, PlusCircle, Save, Trash2, List, Edit3, Image as ImageIcon, AlertTriangle } from 'lucide-react';
+import { Loader2, ShieldCheck, FileText, PlusCircle, Save, Trash2, List, Edit3, Image as ImageIcon, AlertTriangle, Upload } from 'lucide-react'; // Added Upload icon
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -21,8 +21,10 @@ import {
 import { Separator } from '@/components/ui/separator';
 import { validateStoryData, validateChapterData } from '@/services/validationService';
 import { fetchAdminStories, saveStory, saveChapter, deleteStory, deleteChapter } from '@/lib/firebaseService'; // Import Firebase service functions
+import { uploadFile } from '@/lib/storageService'; // Import storage service
 import type { Story, Chapter } from '@/types'; // Import shared types
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import Image from 'next/image'; // Import next/image
 
 export default function AdminWritePage() {
   const router = useRouter();
@@ -38,6 +40,7 @@ export default function AdminWritePage() {
   const [isLoadingStories, setIsLoadingStories] = React.useState(true); // Loading state for stories
   const [isSaving, setIsSaving] = React.useState(false); // Saving state for story/chapter
   const [isDeleting, setIsDeleting] = React.useState(false); // Deleting state
+  const [isUploading, setIsUploading] = React.useState(false); // Uploading state for cover
 
   // Form state
   const [storyTitle, setStoryTitle] = React.useState('');
@@ -45,8 +48,11 @@ export default function AdminWritePage() {
   const [storyGenre, setStoryGenre] = React.useState('');
   const [storyTags, setStoryTags] = React.useState('');
   const [storyStatus, setStoryStatus] = React.useState<'Draft' | 'Published' | 'Archived'>('Draft');
+  const [storyCoverImageUrl, setStoryCoverImageUrl] = React.useState<string | undefined>(undefined); // Store cover image URL
   const [chapterTitle, setChapterTitle] = React.useState('');
   const [chapterContent, setChapterContent] = React.useState('');
+
+  const fileInputRef = React.useRef<HTMLInputElement>(null); // Ref for file input
 
   // Fetch stories for the admin user on mount
   React.useEffect(() => {
@@ -100,6 +106,7 @@ export default function AdminWritePage() {
       setStoryGenre(selectedStory.genre);
       setStoryTags(selectedStory.tags?.join(', ') || '');
       setStoryStatus(selectedStory.status);
+      setStoryCoverImageUrl(selectedStory.coverImageUrl); // Load existing cover URL
       setIsCreatingNewStory(false);
     } else {
         setStoryTitle('');
@@ -107,6 +114,7 @@ export default function AdminWritePage() {
         setStoryGenre('');
         setStoryTags('');
         setStoryStatus('Draft');
+        setStoryCoverImageUrl(undefined); // Reset cover URL
     }
     setSelectedChapter(null);
     setChapterTitle('');
@@ -151,6 +159,7 @@ export default function AdminWritePage() {
       setStoryGenre('');
       setStoryTags('');
       setStoryStatus('Draft');
+      setStoryCoverImageUrl(undefined); // Reset cover URL
       setChapterTitle('');
       setChapterContent('');
   };
@@ -165,6 +174,63 @@ export default function AdminWritePage() {
       setChapterTitle('New Chapter Title');
       setChapterContent('');
   };
+
+   // Handle clicking the "Upload Cover" button
+   const handleUploadButtonClick = () => {
+      if (fileInputRef.current) {
+         fileInputRef.current.click(); // Trigger the hidden file input
+       }
+   };
+
+   // Handle file selection and upload
+    const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+       if (!event.target.files || event.target.files.length === 0) {
+         return;
+       }
+       const file = event.target.files[0];
+       if (!file || !selectedStory?.id) {
+            toast({ title: "Upload Error", description: "No file selected or story not saved yet.", variant: "destructive" });
+            return;
+        }
+
+       // Basic file validation (optional: add more checks like size, type)
+       if (!file.type.startsWith('image/')) {
+         toast({ title: "Invalid File Type", description: "Please upload an image file.", variant: "destructive" });
+         return;
+       }
+       if (file.size > 5 * 1024 * 1024) { // 5MB limit example
+          toast({ title: "File Too Large", description: "Image size should not exceed 5MB.", variant: "destructive" });
+          return;
+       }
+
+
+       setIsUploading(true);
+       try {
+         // Upload file to Firebase Storage in a 'covers' folder
+         const downloadURL = await uploadFile(file, `stories/${selectedStory.id}/covers`);
+
+         // Update the story document in Firestore with the new URL
+         const storyDataToUpdate: Partial<Story> = { coverImageUrl: downloadURL };
+         await saveStory(selectedStory.id, storyDataToUpdate as any); // Cast needed as saveStory expects full data
+
+         // Update local state immediately
+          setStoryCoverImageUrl(downloadURL);
+          setSelectedStory(prev => prev ? { ...prev, coverImageUrl: downloadURL } : null);
+          setStories(prevStories => prevStories.map(s => s.id === selectedStory.id ? { ...s, coverImageUrl: downloadURL } : s));
+
+
+         toast({ title: "Cover Uploaded", description: "New cover image saved successfully." });
+       } catch (error) {
+         console.error("Error uploading cover image:", error);
+         toast({ title: "Upload Failed", description: "Could not upload cover image.", variant: "destructive" });
+       } finally {
+         setIsUploading(false);
+       }
+       // Reset file input value to allow re-uploading the same file if needed
+        if (fileInputRef.current) {
+            fileInputRef.current.value = '';
+        }
+     };
 
   const handleSaveStory = async () => {
     if (!user?.id || !isAdmin) { // Ensure user is admin
@@ -181,7 +247,7 @@ export default function AdminWritePage() {
         status: storyStatus,
         authorId: user.id, // Associate story with logged-in admin
         authorName: user.name || user.email || 'Admin', // Add author name
-        // Note: coverImageUrl and chapters are handled separately or implicitly
+        coverImageUrl: storyCoverImageUrl, // Include cover image URL
     };
 
     // Server-side validation
@@ -194,7 +260,7 @@ export default function AdminWritePage() {
 
     try {
         // Pass necessary fields explicitly, omit fields managed by Firestore (like reads, potentially chapters depending on structure)
-        const dataToSave: Omit&lt;Story, 'id' | 'chapters' | 'reads' | 'lastUpdated' | 'coverImageUrl'&gt; &amp; { authorId: string } = {
+         const dataToSave: Omit<Story, 'id' | 'chapters' | 'reads' | 'lastUpdated'> & { authorId: string } = {
             title: storyData.title,
             description: storyData.description,
             genre: storyData.genre,
@@ -202,6 +268,9 @@ export default function AdminWritePage() {
             status: storyData.status,
             authorId: storyData.authorId,
             authorName: storyData.authorName,
+            coverImageUrl: storyData.coverImageUrl, // Include cover image URL
+             slug: selectedStory?.slug || storyTitle.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, ''), // Generate slug if new
+             // TODO: Ensure slug uniqueness server-side if necessary
         };
 
         const savedStoryId = await saveStory(selectedStory?.id, dataToSave); // Pass existing ID if editing
@@ -212,7 +281,6 @@ export default function AdminWritePage() {
             id: savedStoryId,
             chapters: storySnapshot.chapters, // Preserve chapters locally
             reads: storySnapshot.reads, // Preserve reads
-            coverImageUrl: selectedStory?.coverImageUrl, // Keep existing URL
             lastUpdated: new Date(), // Update timestamp locally (Firestore handles server time)
         };
 
@@ -260,7 +328,7 @@ export default function AdminWritePage() {
     }
 
     try {
-        const dataToSave: Omit&lt;Chapter, 'id' | 'lastUpdated'&gt; = {
+        const dataToSave: Omit<Chapter, 'id' | 'lastUpdated'> = {
              title: chapterData.title,
              content: chapterData.content,
              storyId: chapterData.storyId,
@@ -355,7 +423,7 @@ export default function AdminWritePage() {
         }
    };
 
-  const totalLoading = authLoading || isLoadingStories || isSaving || isDeleting;
+  const totalLoading = authLoading || isLoadingStories || isSaving || isDeleting || isUploading;
 
   if (authLoading || (!isAdmin && !authLoading) ) { // Show loader until auth check complete, or if redirecting
     return (
@@ -375,7 +443,7 @@ export default function AdminWritePage() {
              <AlertTriangle className="h-4 w-4" />
              <AlertTitle>Security Reminder</AlertTitle>
              <AlertDescription>
-                Ensure your Firestore security rules are correctly configured to restrict write access to administrators only. Client-side checks alone are not sufficient.
+                Ensure your Firestore security rules are correctly configured to restrict write access to administrators only. Client-side checks alone are not sufficient. Ensure Storage rules also restrict uploads to admins.
              </AlertDescription>
          </Alert>
 
@@ -413,7 +481,7 @@ export default function AdminWritePage() {
               )}
             </CardContent>
              {selectedStory && (
-                 &lt;&gt;
+                 <>
                  <Separator />
                   <CardHeader className="pb-3 pt-4">
                      <CardTitle className="text-lg flex items-center justify-between">
@@ -440,7 +508,7 @@ export default function AdminWritePage() {
                          </Card>
                      )}
                    </CardContent>
-                  &lt;/>
+                  </>
               )}
           </Card>
         </div>
@@ -519,13 +587,38 @@ export default function AdminWritePage() {
                         </Select>
                     </div>
                      <div>
-                       <Label htmlFor="coverImage">Cover Image (Placeholder)</Label>
-                       <div className="flex items-center gap-2 mt-1">
-                          {selectedStory?.coverImageUrl && !isCreatingNewStory && (
-                              <img src={selectedStory.coverImageUrl} alt="Current Cover" className="h-16 w-auto rounded border bg-muted" />
+                       <Label htmlFor="coverImage">Cover Image</Label>
+                       <div className="flex items-center gap-4 mt-1">
+                          {storyCoverImageUrl && !isCreatingNewStory && (
+                             <div className="relative h-24 w-16 rounded border bg-muted overflow-hidden">
+                               <Image
+                                 src={storyCoverImageUrl}
+                                 alt="Current Cover"
+                                 fill
+                                 style={{ objectFit: 'cover' }}
+                                 sizes="64px"
+                                 data-ai-hint="admin cover image preview"
+                               />
+                             </div>
                           )}
-                          <Button variant="outline" size="sm" disabled={totalLoading}><ImageIcon className="h-4 w-4 mr-1" /> Upload Cover</Button>
-                          <p className="text-xs text-muted-foreground">Upload feature coming soon.</p>
+                          <input
+                            type="file"
+                            ref={fileInputRef}
+                            onChange={handleFileChange}
+                            accept="image/*"
+                            style={{ display: 'none' }} // Hide the default input
+                            disabled={totalLoading || !selectedStory?.id}
+                          />
+                          <Button
+                             variant="outline"
+                             size="sm"
+                             onClick={handleUploadButtonClick}
+                             disabled={totalLoading || !selectedStory?.id}
+                          >
+                             {isUploading ? <Loader2 className="h-4 w-4 mr-1 animate-spin"/> : <Upload className="h-4 w-4 mr-1" />}
+                             {storyCoverImageUrl ? 'Change Cover' : 'Upload Cover'}
+                          </Button>
+                           {!selectedStory?.id && !isCreatingNewStory && <p className="text-xs text-muted-foreground">Save the story first to upload a cover.</p>}
                         </div>
                      </div>
                     <Button onClick={handleSaveStory} disabled={totalLoading}>

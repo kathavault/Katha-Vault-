@@ -2,6 +2,7 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getFirestore } from 'firebase/firestore';
 import { getAuth } from "firebase/auth"; // Import getAuth
+import { getStorage } from "firebase/storage"; // Import getStorage
 
 // Your web app's Firebase configuration
 // Use environment variables for sensitive data
@@ -23,3 +24,6 @@ export const db = getFirestore(app);
 
 // Export Firebase Authentication instance
 export const auth = getAuth(app);
+
+// Export Firebase Storage instance
+export const storage = getStorage(app);
