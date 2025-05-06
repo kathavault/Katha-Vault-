@@ -1,0 +1,98 @@
+
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper function to check if the requesting user is an admin
+    function isAdmin(userId) {
+      // Check if the user document exists and the isAdmin field is true
+      return exists(/databases/$(database)/documents/users/$(userId)) &&
+             get(/databases/$(database)/documents/users/$(userId)).data.isAdmin == true;
+    }
+
+    // Stories Collection
+    match /stories/{storyId} {
+      // Allow anyone to read published stories (adjust if auth needed for reads)
+      allow read: if resource.data.status == 'Published' || (request.auth != null && request.auth.uid == resource.data.authorId) || isAdmin(request.auth.uid);
+      // Allow authenticated admins to create, update, delete any story
+      allow create, update, delete: if request.auth != null && isAdmin(request.auth.uid);
+
+      // Chapters Subcollection
+      match /chapters/{chapterId} {
+        // Allow anyone to read chapters of published stories (adjust based on story read rule)
+        allow read: if get(/databases/$(database)/documents/stories/$(storyId)).data.status == 'Published' || (request.auth != null && request.auth.uid == get(/databases/$(database)/documents/stories/$(storyId)).data.authorId) || isAdmin(request.auth.uid);
+        // Allow authenticated admins to create, update, delete chapters
+        allow create, update, delete: if request.auth != null && isAdmin(request.auth.uid);
+
+         // Comments Subcollection (Chapter Level)
+         match /comments/{commentId} {
+            // Allow authenticated users to read comments
+            allow read: if request.auth != null;
+            // Allow authenticated users to create comments (validate userId matches auth)
+            allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
+            // Allow comment owner or admin to delete
+            allow delete: if request.auth != null && (request.auth.uid == resource.data.userId || isAdmin(request.auth.uid));
+            // Generally disallow updates to comments after creation
+            allow update: if false;
+         }
+
+         // Ratings Subcollection (Chapter Level)
+         match /ratings/{userId} {
+             // Allow authenticated users to read ratings (optional, maybe restrict)
+             allow read: if request.auth != null;
+             // Allow authenticated users to create/update their own rating
+             allow write: if request.auth != null && request.auth.uid == userId;
+         }
+      }
+
+      // Comments Subcollection (Story Level)
+      match /comments/{commentId} {
+         // Allow authenticated users to read comments
+         allow read: if request.auth != null;
+         // Allow authenticated users to create comments (validate userId matches auth)
+         allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
+         // Allow comment owner or admin to delete
+         allow delete: if request.auth != null && (request.auth.uid == resource.data.userId || isAdmin(request.auth.uid));
+         // Generally disallow updates to comments after creation
+         allow update: if false;
+      }
+
+       // Ratings Subcollection (Story Level)
+       match /ratings/{userId} {
+           // Allow authenticated users to read ratings (optional, maybe restrict)
+           allow read: if request.auth != null;
+           // Allow authenticated users to create/update their own rating
+           allow write: if request.auth != null && request.auth.uid == userId;
+       }
+    }
+
+    // Users Collection
+    match /users/{userId} {
+      // Allow user to read/update their own profile
+      allow read, update: if request.auth != null && request.auth.uid == userId;
+      // Allow admin to read/update any user profile (be careful with writes)
+      allow read, update: if request.auth != null && isAdmin(request.auth.uid);
+      // Disallow direct creation/deletion by clients (handle via trusted server/functions)
+      allow create, delete: if false;
+      // Example: Only allow updating specific fields like 'name', 'avatarUrl', 'bio' by the user
+      // allow update: if request.auth != null && request.auth.uid == userId &&
+      //                   request.resource.data.keys().hasOnly(['name', 'avatarUrl', 'bio', 'isAdmin', 'email']); // Ensure only allowed fields are updated
+      // Example: Only allow admin to update the 'isAdmin' field
+      // allow update: if request.auth != null && isAdmin(request.auth.uid) && request.resource.data.keys().hasOnly(['isAdmin']); // More granular control needed
+    }
+
+     // User Library Subcollection
+     match /users/{userId}/library/{storyId} {
+        // Allow user to read/write their own library entries
+        allow read, write: if request.auth != null && request.auth.uid == userId;
+     }
+
+
+    // Site Settings Collection (Assuming a single document, e.g., 'config')
+    match /siteSettings/config { // Adjust 'config' if using a different document ID
+      // Allow only authenticated admins to read and write site settings
+      allow read, write: if request.auth != null && isAdmin(request.auth.uid);
+    }
+
+  }
+}
