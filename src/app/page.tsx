@@ -147,7 +147,7 @@ const mockStories: Story[] = [
     chapters: 50, // Representing 50 poems
     tags: ['Emotional', 'Reflective', 'Verse'],
     slug: 'poetry-for-the-soul',
-    priority: true,
+    priority: true, // Explicitly setting priority for this story
      dataAiHint: 'poetry collection book cover',
   },
     {
@@ -202,8 +202,12 @@ const Home: NextPage = () => {
           </Button>
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4 md:gap-6">
-          {trendingStories.map((story) => (
-            <StoryCard key={story.id} story={story} />
+          {trendingStories.map((story, index) => (
+            <StoryCard
+              key={story.id}
+              story={story}
+              priority={index < 6} // Set priority true for the first few (e.g., 6) cards in this visible section
+            />
           ))}
         </div>
       </section>
@@ -222,7 +226,7 @@ const Home: NextPage = () => {
         </div>
          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4 md:gap-6">
            {newStories.map((story) => (
-             <StoryCard key={story.id} story={story} />
+             <StoryCard key={story.id} story={story} /> // Priority might not be needed here if below the fold
            ))}
          </div>
       </section>
@@ -241,7 +245,7 @@ const Home: NextPage = () => {
          </div>
          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4 md:gap-6">
            {featuredStories.map((story) => (
-             <StoryCard key={story.id} story={story} />
+             <StoryCard key={story.id} story={story} /> // Priority might not be needed here if below the fold
            ))}
          </div>
        </section>

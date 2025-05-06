@@ -18,15 +18,17 @@ export type Story = {
   chapters: number;
   tags?: string[];
   slug: string; // For linking to the story page
+  priority?: boolean; // Add optional priority prop
   dataAiHint?: string; // Optional AI hint for image generation
 };
 
 interface StoryCardProps {
   story: Story;
   className?: string; // Allow passing additional classes
+  priority?: boolean; // Add optional priority prop
 }
 
-const StoryCard: FC<StoryCardProps> = ({ story, className }) => {
+const StoryCard: FC<StoryCardProps> = ({ story, className, priority = false }) => {
   return (
     <Card className={cn("w-full overflow-hidden border border-border/80 hover:border-border hover:shadow-md transition-all duration-200 group bg-card", className)}>
       <Link href={`/story/${story.slug}`} className="block h-full flex flex-col">
@@ -37,8 +39,8 @@ const StoryCard: FC<StoryCardProps> = ({ story, className }) => {
             fill // Use fill instead of layout="fill"
             sizes="(max-width: 640px) 50vw, (max-width: 768px) 33vw, (max-width: 1024px) 25vw, 16.6vw" // Provide sizes for optimization
             className="object-cover group-hover:scale-105 transition-transform duration-300 ease-in-out" // Smooth transition
+            priority={priority} // Use the passed priority prop
             data-ai-hint={story.dataAiHint || "book cover story"} // Use provided hint or default
-            priority={false} // Generally false unless it's critical LCP element
           />
            {/* Subtle gradient overlay for text contrast */}
            <div className="absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-black/70 via-black/40 to-transparent"></div>
