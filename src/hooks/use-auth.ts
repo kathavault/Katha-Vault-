@@ -16,6 +16,10 @@ import {
   getIdTokenResult, // Import to get custom claims
 } from 'firebase/auth';
 import { auth } from '@/lib/firebase'; // Import auth from firebase setup
+
+// Define the admin email directly in the hook for checking
+const ADMIN_EMAIL = 'kathavault@gmail.com';
+
 import { useToast } from './use-toast'; // Import useToast
 
 // Define the user type structure we'll use in the app
@@ -52,8 +56,14 @@ export function useAuth() {
           console.log("Admin claim found:", adminStatus); // Log for debugging
         } catch (error) {
             console.error("Error fetching custom claims:", error);
-            // Handle error fetching claims, maybe default to non-admin
-            adminStatus = false;
+            // Fallback check: Check if the email matches the hardcoded admin email
+            // This provides a secondary way to identify the admin if claims fail/aren't set.
+            if (firebaseUser.email === ADMIN_EMAIL) {
+                console.log("Admin email matched as fallback.");
+                adminStatus = true;
+            } else {
+                adminStatus = false;
+            }
         }
 
         const appUser: User = {
@@ -62,17 +72,19 @@ export function useAuth() {
           name: firebaseUser.displayName,
           avatarUrl: firebaseUser.photoURL,
           emailVerified: firebaseUser.emailVerified, // Get verification status
-          isAdmin: adminStatus, // Set based on custom claim
+          isAdmin: adminStatus, // Set based on custom claim or email fallback
         };
         setUser(appUser);
         setIsAdmin(adminStatus);
 
-        // Trigger simulated OTP step ONLY if the user is confirmed as admin via claims
+        // Trigger simulated OTP step ONLY if the user is confirmed as admin
         // AND hasn't completed the simulated OTP step yet in this session.
-        // IMPORTANT: This is still a simulation. Real MFA is needed.
-        // Let's simplify: If admin logs in (claim verified), trigger OTP simulation.
+        // IMPORTANT: This is still a simulation. Real MFA is needed. We use adminStatus which
+        // now considers both claims and the hardcoded email as a fallback.
+
+        // Let's simplify: If admin logs in (claim verified or email matches), trigger OTP simulation.
         // Reset OTP state on user change.
-        setIsVerifyingAdminOtp(adminStatus); // Trigger OTP if admin claim is true
+        setIsVerifyingAdminOtp(adminStatus); // Trigger OTP if admin claim is true or email matches
 
       } else {
         // User is signed out
@@ -137,6 +149,11 @@ export function useAuth() {
            adminStatus = !!idTokenResult.claims.admin;
        } catch (claimError) {
            console.error("Error fetching claims on login:", claimError);
+           // Fallback check: Check if the email matches the hardcoded admin email
+           if (firebaseUser.email === ADMIN_EMAIL) {
+               console.log("Admin email matched as fallback during login.");
+               adminStatus = true;
+           }
        }
 
       // Check if email is verified (unless it's an admin logging in)
@@ -278,7 +295,7 @@ export function useAuth() {
   // WARNING: THIS IS A SIMULATION AND NOT SECURE FOR PRODUCTION.
   // It only proceeds if the user has already been identified as admin via custom claims.
   const verifyAdminOtp = useCallback(async (phoneOtp: string, emailOtp: string): Promise<boolean> => {
-    if (!user || !isAdmin) { // Check claim-based isAdmin status
+    if (!user || !isAdmin) { // Check claim-based or email-fallback isAdmin status
       toast({ title: "Error", description: "Admin user not properly logged in.", variant: "destructive" });
       return false;
     }
@@ -286,8 +303,8 @@ export function useAuth() {
     return new Promise((resolve) => {
       setTimeout(() => {
          // Simulate checking hardcoded OTPs for demonstration ONLY
-         const correctPhoneOtp = "123456";
-         const correctEmailOtp = "654321";
+         const correctPhoneOtp = "123456"; // Example OTP for phone 9756745653
+         const correctEmailOtp = "654321"; // Example OTP for emails superworth00@gmail.com/rajputkritika87555@gmail.com
          const success = phoneOtp === correctPhoneOtp && emailOtp === correctEmailOtp;
 
         setIsLoading(false);
@@ -356,7 +373,8 @@ export function useAuth() {
   };
 }
 
-// NOTE: The admin check now relies on Firebase Custom Claims.
-// You need to set the 'admin: true' custom claim on the admin user's account
+// NOTE: The admin check now relies on Firebase Custom Claims primarily,
+// with a fallback to checking the hardcoded email address.
+// You still need to set the 'admin: true' custom claim on the admin user's account
 // (e.g., using Firebase Functions or the Firebase Admin SDK in a secure environment).
 // The OTP verification remains a simulation and is insecure.
