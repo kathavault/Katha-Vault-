@@ -15,7 +15,7 @@ import React, { useEffect, useState, Suspense } from 'react'; // Import React an
 import { useAuth } from '@/hooks/use-auth'; // Import useAuth
 import { Textarea } from '@/components/ui/textarea'; // Import Textarea
 import { useToast } from '@/hooks/use-toast'; // Import useToast
-import { validateCommentData, validateRatingData } from '@/services/validationService'; // Import validation functions
+import { validateCommentData, validateRatingData } from '@/services/validationService'; // Import validation function
 import { fetchStoryDetails, submitStoryComment, submitStoryRating, toggleLibraryStatus } from '@/lib/storyService'; // Import story-specific services
 import type { Timestamp } from 'firebase/firestore'; // Import Timestamp type
 
@@ -170,10 +170,41 @@ const StoryDetailPage: NextPage<StoryPageProps> = ({ params }) => {
     }
   };
 
-  const handleShareStory = () => {
-    console.log("Sharing story:", story?.title);
-    // TODO: Implement actual sharing logic
-    toast({ title: "Share Feature (Coming Soon)", description: "Sharing options will be available here." });
+  const handleShareStory = async () => {
+      if (!story) {
+          toast({ title: "Error", description: "Story not available.", variant: "destructive" });
+          return;
+      }
+      const shareData = {
+          title: story.title,
+          text: story.description,
+          url: window.location.href,
+      };
+      if (navigator.share) {
+          try {
+              await navigator.share(shareData);
+          } catch (error) {
+              toast({ title: "Share Failed", description: "Could not share the story. Please try again.", variant: "destructive" });
+          }
+      } else {
+          toast({ title: "Share Not Supported", description: "Sharing is not supported in your browser.", variant: "destructive" });
+      }
+  };
+
+  const handleCopyUrl = () => {
+    if (!story) {
+      toast({ title: "Error", description: "Story not available.", variant: "destructive" });
+      return;
+    }
+    const storyUrl = window.location.href;
+    navigator.clipboard.writeText(storyUrl)
+      .then(() => {
+        toast({ title: "Copied!", description: "Story URL copied to clipboard." });
+      })
+      .catch(error => {
+        console.error("Failed to copy story URL:", error);
+        toast({ title: "Error", description: "Failed to copy URL. Please try again.", variant: "destructive" });
+      });
   };
 
   const handleToggleLibrary = async () => {
@@ -210,7 +241,7 @@ const StoryDetailPage: NextPage<StoryPageProps> = ({ params }) => {
   const hasHalfStar = (story.averageRating || 0) % 1 >= 0.5;
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12">
+    <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 relative">
       <div className="lg:col-span-4 xl:col-span-3 space-y-6">
         <div className="sticky top-20 space-y-6">
           <Card className="overflow-hidden shadow-lg border border-border/80">
@@ -221,7 +252,7 @@ const StoryDetailPage: NextPage<StoryPageProps> = ({ params }) => {
                 fill
                 sizes="(max-width: 1024px) 100vw, 33vw"
                 className="object-cover"
-                priority // Prioritize loading cover image
+                {...(story.coverImageUrl && { priority: true })} // Prioritize loading cover image if present
                 data-ai-hint={story.dataAiHint || "book cover story detail"}
               />
             </div>
@@ -324,9 +355,14 @@ const StoryDetailPage: NextPage<StoryPageProps> = ({ params }) => {
               </CardContent>
             </Card>
           )}
-          <Button variant="outline" className="w-full" onClick={handleShareStory}>
-            <Share2 className="mr-2 h-4 w-4" /> Share Story
-          </Button>
+           <div className="flex items-center gap-2 w-full">
+               <Button variant="outline" className="w-1/2" onClick={handleShareStory}>
+                   <Share2 className="mr-2 h-4 w-4" /> Share
+               </Button>
+               <Button variant="outline" className="w-1/2" onClick={handleCopyUrl}>
+                    Copy Link
+               </Button>
+           </div>
         </div>
       </div>
 

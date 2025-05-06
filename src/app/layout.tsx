@@ -17,23 +17,24 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning> {/* suppressHydrationWarning needed for next-themes */}
-      <body className={`antialiased flex flex-col min-h-screen`}> {/* Remove bg-background, let theme handle it */}
-         <ThemeProvider
-             attribute="class"
-             defaultTheme="system"
-             enableSystem
-             disableTransitionOnChange
-           >
-           <AuthProvider>
-              <Header />
-              <main className="flex-grow container px-4 sm:px-6 lg:px-8 py-6 md:py-8">
+    <html lang="en" suppressHydrationWarning>      
+      <body className={`antialiased flex flex-col min-h-screen`}>
+        <AuthProvider>
+          {/* ThemeProvider should wrap the components inside the body, not the main element directly */}
+          <ThemeProvider
+            attribute="class"
+            defaultTheme="system"
+            enableSystem
+            disableTransitionOnChange
+          >
+            <Header />
+            <main className="flex-grow container px-4 sm:px-6 lg:px-8 py-6 md:py-8">
                 {children}
-              </main>
-              <Footer />
-              <Toaster />
-           </AuthProvider>
+            </main>
+            <Footer />
+            <Toaster />
           </ThemeProvider>
+        </AuthProvider>
       </body>
     </html>
   );
