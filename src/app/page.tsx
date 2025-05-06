@@ -147,6 +147,7 @@ const mockStories: Story[] = [
     chapters: 50, // Representing 50 poems
     tags: ['Emotional', 'Reflective', 'Verse'],
     slug: 'poetry-for-the-soul',
+    priority: true,
      dataAiHint: 'poetry collection book cover',
   },
     {
