@@ -63,7 +63,7 @@ interface ChapterDetailsResult {
 /**
  * Fetches detailed information for a specific chapter, including comments.
  */
-export const fetchChapterDetails = async (slug: string, chapterNumber: number, userId?: string | null): Promise&lt;ChapterDetailsResult | null&gt; => {
+export const fetchChapterDetails = async (slug: string, chapterNumber: number, userId?: string | null): Promise<ChapterDetailsResult | null> => {
     try {
         // 1. Find the story by slug
         const storiesRef = collection(db, "stories");
@@ -88,7 +88,7 @@ export const fetchChapterDetails = async (slug: string, chapterNumber: number, u
             return null;
         }
         const chapterDoc = chapterSnapshot.docs[0];
-        const chapterData = chapterDoc.data() as Omit&lt;Chapter, 'id'&gt;;
+        const chapterData = chapterDoc.data() as Omit<Chapter, 'id'>; // Fixed Omit syntax
         const chapterId = chapterDoc.id;
 
         // 3. Fetch comments for this chapter (e.g., last 20)
@@ -142,7 +142,7 @@ export const fetchChapterDetails = async (slug: string, chapterNumber: number, u
 /**
  * Submits a comment for a specific chapter.
  */
-export const submitComment = async (params: SubmitCommentParams): Promise&lt;{ id: string }&gt; => {
+export const submitComment = async (params: SubmitCommentParams): Promise<{ id: string }> => {
     const { storyId, chapterId, userId, text } = params;
 
     if (!auth.currentUser || auth.currentUser.uid !== userId) {
@@ -171,13 +171,13 @@ export const submitComment = async (params: SubmitCommentParams): Promise&lt;{ i
 /**
  * Submits or updates a rating for a specific chapter.
  */
-export const submitRating = async (params: SubmitRatingParams): Promise&lt;void&gt; => {
+export const submitRating = async (params: SubmitRatingParams): Promise<void> => {
     const { storyId, chapterId, userId, rating } = params;
 
      if (!auth.currentUser || auth.currentUser.uid !== userId) {
         throw new Error("User is not authenticated or UID mismatch.");
      }
-     if (rating &lt; 1 || rating &gt; 5) {
+     if (rating < 1 || rating > 5) {
          throw new Error("Rating must be between 1 and 5.");
      }
 
@@ -212,3 +212,4 @@ export const submitRating = async (params: SubmitRatingParams): Promise&lt;void&
         throw new Error("Failed to submit rating.");
     }
 };
+
