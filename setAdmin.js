@@ -14,7 +14,7 @@ admin.initializeApp({
 
 // **Important:** Replace this placeholder with the actual Firebase UID of the user you want to make an admin.
 // You can find the UID in the Firebase Authentication console.
-const uid = "YAHAN_APNA_UID_DALO";
+const uid = "SpiTC3hGgZfXTHMOiIHdf59Dngg2"; // User provided UID
 
 if (uid === "YAHAN_APNA_UID_DALO") {
     console.error("Error: Please replace 'YAHAN_APNA_UID_DALO' with the actual Firebase User ID.");
