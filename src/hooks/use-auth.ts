@@ -86,7 +86,7 @@ export function useAuth() {
 
 
         if (adminStatus) {
-          setIsVerifyingAdminOtp(true); 
+          setIsVerifyingAdminOtp(true);
           console.log("onAuthStateChanged: Admin identified, OTP verification step initiated.");
         } else {
           setIsVerifyingAdminOtp(false);
@@ -183,7 +183,7 @@ export function useAuth() {
         setIsLoading(false);
         return null;
       }
-      
+
       // Do not set user/isAdmin state directly here, onAuthStateChanged is the source of truth.
       // However, we need to set isVerifyingAdminOtp based on this immediate check.
       if (adminStatus) {
@@ -242,7 +242,7 @@ export function useAuth() {
       // For social logins, we assume they don't need the simulated OTP step for admin
       // unless onAuthStateChanged later confirms admin AND isVerifyingAdminOtp is set there.
       // For simplicity, we set it to false here.
-      setIsVerifyingAdminOtp(false); 
+      setIsVerifyingAdminOtp(false);
 
       toast({ title: "Login Successful", description: `Welcome, ${appUser.name || 'User'}!` });
       return appUser; // Let onAuthStateChanged handle setting context state
@@ -309,14 +309,14 @@ export function useAuth() {
   // WARNING: THIS IS A SIMULATION AND NOT SECURE FOR PRODUCTION.
   const verifyAdminOtp = useCallback(async (phoneOtp: string, emailOtp: string): Promise<boolean> => {
     // This check ensures that we only proceed if onAuthStateChanged has ALREADY confirmed admin status
-    if (!user || !isAdmin) { 
+    if (!user || !isAdmin) {
       toast({ title: "Error", description: "Admin status not confirmed. Cannot verify OTP.", variant: "destructive" });
       return false;
     }
     setIsLoading(true); // Should be a different loading state, e.g., isSubmittingOtp
     return new Promise((resolve) => {
       setTimeout(() => {
-         const correctPhoneOtp = "123456"; 
+         const correctPhoneOtp = "123456";
          const correctEmailOtp = "654321";
          const success = phoneOtp === correctPhoneOtp && emailOtp === correctEmailOtp;
 
@@ -332,7 +332,7 @@ export function useAuth() {
           // isVerifyingAdminOtp remains true, so user stays on OTP page
           resolve(false);
         }
-      }, 700); 
+      }, 700);
     });
   }, [user, isAdmin, toast]);
 
@@ -348,7 +348,7 @@ export function useAuth() {
       console.error("Logout error:", error);
       toast({ title: "Logout Failed", description: error.message || "Could not log out.", variant: "destructive" });
     } finally {
-      setIsLoading(false); 
+      setIsLoading(false);
     }
   };
 
@@ -382,7 +382,7 @@ export function useAuth() {
     user,
     isAdmin,
     isLoading,
-    isVerifyingAdminOtp, 
+    isVerifyingAdminOtp,
     signupWithEmail,
     loginWithEmail,
     loginWithGoogle,

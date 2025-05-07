@@ -3,6 +3,7 @@ import StoryCard, { type Story } from '@/components/story/story-card';
 import { Button } from '@/components/ui/button';
 import { ArrowRight, Zap, TrendingUp, Feather, Sparkles } from 'lucide-react'; // Added Sparkles icon
 import Link from 'next/link';
+import Image from 'next/image'; // Ensure Image is imported
 
 // Expanded and diversified mock data
 const mockStories: Story[] = [
@@ -147,7 +148,7 @@ const mockStories: Story[] = [
     chapters: 50, // Representing 50 poems
     tags: ['Emotional', 'Reflective', 'Verse'],
     slug: 'poetry-for-the-soul',
-    priority: true, 
+    priority: true,
      dataAiHint: 'poetry collection book cover',
   },
     {
@@ -171,7 +172,7 @@ const shortStories: Story[] = [
     title: 'Dil Ke Raaste',
     author: 'Katha Vault',
     description: 'Ek anokhi prem kahani jo dil ke raaston se hokar guzarti hai, jahan har mod par ek nayi ummeed hai.',
-    coverImageUrl: 'https://i.imgur.com/your-new-image-url.png', // New cover image URL
+    coverImageUrl: 'https://i.imgur.com/F6H94Zd.png', // Updated cover image URL
     genre: 'Romance',
     reads: 15250,
     chapters: 10, // Short stories have fewer chapters
@@ -212,8 +213,8 @@ const shortStories: Story[] = [
 
 const Home: NextPage = () => {
   const trendingStories = mockStories.sort((a, b) => b.reads - a.reads).slice(0, 6);
-  const newStories = mockStories.slice().reverse().slice(0, 6); 
-  const featuredStories = mockStories.filter(s => ['Fantasy', 'Sci-Fi', 'Romance'].includes(s.genre)).slice(0, 6); 
+  const newStories = mockStories.slice().reverse().slice(0, 6);
+  const featuredStories = mockStories.filter(s => ['Fantasy', 'Sci-Fi', 'Romance'].includes(s.genre)).slice(0, 6);
   const displayedShortStories = shortStories.slice(0, 6); // Show up to 6 short stories
 
   return (
@@ -228,6 +229,7 @@ const Home: NextPage = () => {
           <Button size="lg" asChild className="bg-primary text-primary-foreground hover:bg-primary/90 shadow-md hover:shadow-lg transition-shadow">
             <Link href="/browse">Start Reading</Link>
           </Button>
+           {/* Start Writing button is removed from here and will be shown conditionally in the header for admins */}
          </div>
       </section>
 
@@ -248,7 +250,7 @@ const Home: NextPage = () => {
             <StoryCard
               key={story.id}
               story={story}
-              priority={index < 6} 
+              priority={index < 6}
             />
           ))}
         </div>
@@ -280,7 +282,7 @@ const Home: NextPage = () => {
             <Sparkles className="w-6 h-6 text-yellow-500" /> Short Stories
           </h2>
           <Button variant="link" asChild className="text-primary hover:text-primary/80">
-            <Link href="/browse?category=short-stories"> 
+            <Link href="/browse?category=short-stories">
               See All <ArrowRight className="ml-1 h-4 w-4" />
             </Link>
           </Button>
@@ -296,10 +298,10 @@ const Home: NextPage = () => {
        <section>
          <div className="flex justify-between items-center mb-4">
            <h2 className="text-2xl font-semibold flex items-center gap-2">
-             <Feather className="w-6 h-6 text-secondary-foreground" /> Featured Fantasy & Sci-Fi
+             <Feather className="w-6 h-6 text-secondary-foreground" /> Featured Fantasy &amp; Sci-Fi
            </h2>
            <Button variant="link" asChild className="text-primary hover:text-primary/80">
-             <Link href="/browse?genre=Fantasy&genre=Sci-Fi"> 
+             <Link href="/browse?genre=Fantasy&amp;genre=Sci-Fi">
                See All <ArrowRight className="ml-1 h-4 w-4" />
              </Link>
            </Button>
@@ -315,4 +317,3 @@ const Home: NextPage = () => {
 };
 
 export default Home;
-

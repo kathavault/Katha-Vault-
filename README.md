@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Katha Vault - Hindi Novel Website
 
 This is a web application built with Next.js for reading and potentially writing Hindi novels, similar in concept to platforms like Wattpad.
@@ -130,3 +131,8 @@ Refer to the [Firebase Hosting documentation](https://firebase.google.com/docs/h
 *   **Environment Variables:** Never commit sensitive keys (like API keys or service account keys) directly into your code. Use environment variables.
 *   **Input Validation:** Always validate user input on the server-side (e.g., using Firebase Functions or server actions) before saving to the database.
 ```
+=======
+<<<<<<< HEAD
+# Katha-Vault-
+Hindi novel website
+>>>>>>> eeac1358d3ae1f112a5aa4ef27eebeb43ae4c6bf

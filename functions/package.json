@@ -14,7 +14,11 @@
   },
   "main": "index.js",
   "dependencies": {
+<<<<<<< HEAD
     "firebase-admin": "^12.7.0",
+=======
+    "firebase-admin": "^12.2.0",
+>>>>>>> eeac1358d3ae1f112a5aa4ef27eebeb43ae4c6bf
     "firebase-functions": "^5.0.1"
   },
   "devDependencies": {

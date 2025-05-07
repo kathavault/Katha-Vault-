@@ -1,6 +1,6 @@
 'use client'; // Add this directive
 
-import React, { useState, useEffect } from 'react'; // Import useState, useEffect
+import type { FC } from 'react';
 import Link from 'next/link';
 import { BookOpen, Search, Menu, ChevronDown, Edit, LogIn, UserPlus, LogOut, UserCircle, ShieldCheck, Pencil, Library, Settings as SettingsIcon, User as UserIcon, MailWarning, Loader2 } from 'lucide-react'; // Added icons & Loader2
 import { Button } from '@/components/ui/button';
@@ -20,15 +20,9 @@ import { useAuth } from '@/hooks/use-auth';
 import { useToast } from '@/hooks/use-toast'; // Import useToast
 import { ThemeToggle } from '@/components/layout/theme-toggle'; // Import ThemeToggle
 
-const Header: React.FC = () => {
+const Header: FC = () => {
   const { user, isAdmin, logout, isLoading } = useAuth(); // Use the simulated auth hook
   const { toast } = useToast(); // Get toast function
-  const [isMounted, setIsMounted] = useState(false); // State to track mount status
-
-  useEffect(() => {
-    setIsMounted(true); // Set to true after component mounts on client
-  }, []);
-
 
   const handleLogout = async () => {
       await logout();
@@ -81,7 +75,7 @@ const Header: React.FC = () => {
                  </Link>
                </Button>
                {/* Conditional Write/Admin Link */}
-                {isMounted && isAdmin && user && ( // Only show if mounted, admin and logged in
+                {isAdmin && user && ( // Only show if admin and logged in
                     <Button variant="ghost" asChild className="justify-start px-4 text-lg font-medium">
                         <Link href="/admin" className="text-foreground hover:text-primary">
                            <ShieldCheck className="mr-2 h-5 w-5" /> Admin Panel
@@ -94,7 +88,7 @@ const Header: React.FC = () => {
 
                {/* Auth section at the bottom */}
                <div className="mt-auto pb-6">
-                   {!isMounted || isLoading ? ( // Show loading state until mounted and auth is resolved
+                   {isLoading ? (
                        <div className="px-4 py-2 text-center text-muted-foreground flex items-center justify-center">
                            <Loader2 className="h-5 w-5 animate-spin mr-2" /> Loading...
                         </div>
@@ -189,7 +183,7 @@ const Header: React.FC = () => {
                </DropdownMenuContent>
              </DropdownMenu>
               {/* Admin-specific Write link */}
-              {isMounted && isAdmin && user && ( // Only show if mounted, admin and logged in
+              {isAdmin && user && ( // Only show if admin and logged in
                   <Button variant="ghost" asChild className="text-foreground hover:text-primary font-medium">
                       <Link href="/admin/write">
                          <Pencil className="mr-1 h-4 w-4" /> Write/Edit
@@ -212,7 +206,7 @@ const Header: React.FC = () => {
         {/* Right Section - Actions */}
         <div className="flex items-center gap-2 shrink-0">
            <ThemeToggle /> {/* Add ThemeToggle here */}
-           {!isMounted || isLoading ? ( // Show loader until mounted and auth is resolved
+           {isLoading ? (
                 <Loader2 className="h-6 w-6 animate-spin text-primary" />
            ) : user ? (
                // Logged-in state: Profile Dropdown
