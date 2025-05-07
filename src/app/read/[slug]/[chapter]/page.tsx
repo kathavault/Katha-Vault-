@@ -4,7 +4,7 @@
 import type { NextPage } from 'next';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { ChevronLeft, ChevronRight, List, Settings, MessageSquare, BookOpenText, Share2, Star, ThumbsUp, Send, Loader2 } from 'lucide-react'; // Added icons & Loader2
+import { ChevronLeft, ChevronRight, List, Settings, MessageSquare, BookOpenText, Share2, Star, ThumbsUp, Send, Loader2 } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 import {
   DropdownMenu,
@@ -12,49 +12,49 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Progress } from "@/components/ui/progress"; // Added Progress bar
-import React, { useEffect, useState, Suspense } from 'react'; // Import React and hooks
-import { useAuth } from '@/hooks/use-auth'; // Import useAuth hook
-import { Textarea } from '@/components/ui/textarea'; // Import Textarea
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'; // Import Card components
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'; // For comment display
-import { useToast } from '@/hooks/use-toast'; // Import useToast
-import { validateCommentData, validateRatingData } from '@/services/validationService'; // Import validation functions
-import { fetchChapterDetails, submitComment, submitRating } from '@/lib/readerService'; // Import reader-specific services
-import type { Timestamp } from 'firebase/firestore'; // Import Timestamp type
+import { Progress } from "@/components/ui/progress";
+import React, { useEffect, useState, Suspense, use } from 'react'; // Import use
+import { useAuth } from '@/hooks/use-auth';
+import { Textarea } from '@/components/ui/textarea';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { useToast } from '@/hooks/use-toast';
+import { validateCommentData, validateRatingData } from '@/services/validationService';
+import { fetchChapterDetails, submitComment, submitRating } from '@/lib/readerService';
+import type { Timestamp } from 'firebase/firestore';
 
-// Define the shape of detailed chapter data fetched from the backend
 interface ChapterDetails {
   title: string;
   content: string;
   storyTitle: string;
   storyAuthor: string;
   totalChapters: number;
-  storyId: string; // Needed for submitting comments/ratings specific to the story
-  chapterId: string; // Needed for submitting comments/ratings specific to the chapter
-  comments?: CommentData[]; // Optional comments array
-  userRating?: number; // User's existing rating for this chapter (0 if none)
-  // Add other relevant fields fetched like average rating for chapter etc.
+  storyId: string;
+  chapterId: string;
+  comments?: CommentData[];
+  userRating?: number;
 }
 
-// Define the shape of a comment
 interface CommentData {
   id: string;
   userId: string;
   userName: string;
   userAvatar?: string | null;
   text: string;
-  timestamp: Date; // Use Date object
+  timestamp: Date;
 }
 
+// Define the shape of the resolved params
+interface ReadPageResolvedParams {
+  slug: string;
+  chapter: string; // Chapter number as string initially
+}
+
+// params prop is now a Promise
 interface ReadPageProps {
-  params: {
-    slug: string;
-    chapter: string; // Chapter number as string initially
-  };
+  params: Promise<ReadPageResolvedParams>;
 }
 
-// Basic content formatting (can be enhanced)
 const formatContent = (text: string): React.ReactNode => {
   const paragraphs = text.trim().split(/\n\s*\n/);
   return paragraphs.map((p, i) => {
@@ -71,33 +71,36 @@ const formatContent = (text: string): React.ReactNode => {
 
       </React.Fragment>
     ));
-    // Using dangerouslySetInnerHTML is generally safe here if the input `text`
-    // is trusted and comes from your own database/admin editor.
-    // If content can be user-generated and saved directly, sanitize it server-side first.
-    // Join the React elements' children (text nodes, strong, em) into a single string for dangerouslySetInnerHTML
-    const htmlContent = lines.map(line => React.Children.toArray(line.props.children).join('')).join('');
+    const htmlContent = lines.map(lineElement => {
+        if (React.isValidElement(lineElement) && lineElement.props.children) {
+            return React.Children.toArray(lineElement.props.children).join('');
+        }
+        return '';
+    }).join('');
     return <p key={i} dangerouslySetInnerHTML={{ __html: htmlContent }}></p>;
   });
 };
 
-const ReadingPage: NextPage<ReadPageProps> = ({ params }) => {
-  const { slug } = params;
-  const chapterNumber = parseInt(params.chapter, 10);
+const ReadingPage: NextPage<ReadPageProps> = (props) => {
+  const resolvedParams = use(props.params); // Unwrap the promise
+  const { slug, chapter: chapterString } = resolvedParams;
+  const chapterNumber = parseInt(chapterString, 10);
+
   const { user, isLoading: authLoading } = useAuth();
   const { toast } = useToast();
   const [chapterData, setChapterData] = useState<ChapterDetails | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [commentText, setCommentText] = useState('');
-  const [rating, setRating] = useState(0); // User's current rating selection
+  const [rating, setRating] = useState(0);
   const [isSubmittingComment, setIsSubmittingComment] = useState(false);
   const [isSubmittingRating, setIsSubmittingRating] = useState(false);
-  const [comments, setComments] = useState<CommentData[]>([]); // Local state for comments
+  const [comments, setComments] = useState<CommentData[]>([]);
 
 
   useEffect(() => {
     const fetchChapter = async () => {
-      if (isNaN(chapterNumber) || chapterNumber < 1) {
-        setChapterData(null)
+      if (!slug || isNaN(chapterNumber) || chapterNumber < 1) {
+        setChapterData(null);
         setIsLoading(false);
         return;
       }
@@ -105,11 +108,11 @@ const ReadingPage: NextPage<ReadPageProps> = ({ params }) => {
       try {
         const data = await fetchChapterDetails(slug, chapterNumber);
         setChapterData(data);
-        setRating(data?.userRating || 0); // Set initial rating based on fetched data
-        setComments(data?.comments || []); // Set initial comments
+        setRating(data?.userRating || 0);
+        setComments(data?.comments || []);
       } catch (error) {
         console.error("Error fetching chapter details:", error);
-        setChapterData(null); // Handle fetch error
+        setChapterData(null);
         toast({
           title: "Error Loading Chapter",
           description: "Could not load the chapter content. Please try again later.",
@@ -119,8 +122,10 @@ const ReadingPage: NextPage<ReadPageProps> = ({ params }) => {
         setIsLoading(false);
       }
     };
-    fetchChapter();
-  }, [slug, chapterNumber, toast]); // Add toast to dependency array
+    if (slug && !isNaN(chapterNumber)) { // Ensure slug and chapterNumber are valid before fetching
+        fetchChapter();
+    }
+  }, [slug, chapterNumber, toast]);
 
   const handleCommentSubmit = async () => {
     if (!user || !chapterData) {
@@ -138,23 +143,22 @@ const ReadingPage: NextPage<ReadPageProps> = ({ params }) => {
     try {
       const newComment = await submitComment({
         storyId: chapterData.storyId,
-        chapterId: chapterData.chapterId, // Assuming chapterId is fetched
+        chapterId: chapterData.chapterId,
         userId: user.id,
         text: commentText,
       });
 
-      // Add the new comment to the local state immediately for optimistic update
       setComments(prevComments => [{
-        id: newComment.id, // Use the ID returned from the service
+        id: newComment.id,
         userId: user.id,
         userName: user.name || 'User',
         userAvatar: user.avatarUrl,
         text: commentText,
-        timestamp: new Date() // Use current time for optimistic update
+        timestamp: new Date()
       }, ...prevComments]);
 
       toast({ title: "Comment Posted", description: "Your comment has been added." });
-      setCommentText(''); // Clear input
+      setCommentText('');
     } catch (error) {
       console.error("Error submitting comment:", error);
       toast({ title: "Error Posting Comment", description: "Could not post your comment. Please try again later.", variant: "destructive" });
@@ -177,13 +181,13 @@ const ReadingPage: NextPage<ReadPageProps> = ({ params }) => {
     }
 
     setIsSubmittingRating(true);
-    const previousRating = rating; // Store previous rating in case of failure
-    setRating(newRating); // Optimistic UI update
+    const previousRating = rating;
+    setRating(newRating);
 
     try {
       await submitRating({
         storyId: chapterData.storyId,
-        chapterId: chapterData.chapterId, // Assuming chapterId is available
+        chapterId: chapterData.chapterId,
         userId: user.id,
         rating: newRating,
       });
@@ -191,7 +195,7 @@ const ReadingPage: NextPage<ReadPageProps> = ({ params }) => {
     } catch (error) {
       console.error("Error submitting rating:", error);
       toast({ title: "Error Submitting Rating", description: "Could not save your rating. Please try again.", variant: "destructive" });
-      setRating(previousRating); // Revert optimistic update on failure
+      setRating(previousRating);
     } finally {
       setIsSubmittingRating(false);
     }
@@ -199,19 +203,18 @@ const ReadingPage: NextPage<ReadPageProps> = ({ params }) => {
 
   const handleShare = () => {
     console.log("Sharing chapter:", chapterData?.title);
-    // TODO: Implement actual sharing logic (e.g., Web Share API)
     toast({ title: "Share Feature (Coming Soon)", description: "Sharing options will be available here." });
   };
 
-  if (isLoading || authLoading) {
+  if (isLoading || authLoading || !slug || isNaN(chapterNumber)) { // Add checks for slug and chapterNumber validity
     return <div className="flex items-center justify-center min-h-screen"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
   }
 
   if (!chapterData) {
     return (
-
       <div className="text-center py-20 flex flex-col items-center gap-4">
         <p className="text-xl text-destructive">
+          Chapter Not Found
         </p>
         <p className="text-muted-foreground">
           {isNaN(chapterNumber) || chapterNumber < 1
@@ -360,7 +363,7 @@ const ReadingPage: NextPage<ReadPageProps> = ({ params }) => {
                   {comments.map((comment) => (
                     <div key={comment.id} className="flex gap-3 items-start">
                       <Avatar className="h-9 w-9">
-                        <AvatarImage src={comment.userAvatar || undefined} alt={comment.userName || 'User'} data-ai-hint="commenter avatar" />
+                        <AvatarImage src={comment.userAvatar || undefined} alt={comment.userName || 'User'} data-ai-hint="commenter avatar"/>
                         <AvatarFallback>{comment.userName?.substring(0, 1).toUpperCase() || 'U'}</AvatarFallback>
                       </Avatar>
                       <div className="p-3 rounded-md bg-background border w-full">
@@ -404,7 +407,6 @@ const ReadingPage: NextPage<ReadPageProps> = ({ params }) => {
   );
 };
 
-// Wrap with Suspense for client components that might use hooks like useSearchParams
 const SuspendedReadingPage: NextPage<ReadPageProps> = (props) => (
   <Suspense fallback={<div className="flex items-center justify-center min-h-screen"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>}>
       <ReadingPage {...props} />

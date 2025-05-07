@@ -1,5 +1,5 @@
+// src/app/story/[slug]/page.tsx
 "use client";
-
 
 import type { NextPage } from 'next';
 import Image from 'next/image';
@@ -9,63 +9,68 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { BookOpen, Eye, Users, MessageSquare, ThumbsUp, List, PlusCircle, Library, CheckCircle, Star, Share2, Send, Loader2 } from 'lucide-react'; // Added/updated icons & Loader2
-import type { Story as BaseStory } from '@/components/story/story-card'; // Rename imported Story
-import React, { useEffect, useState, Suspense } from 'react'; // Import React and hooks
-import { useAuth } from '@/hooks/use-auth'; // Import useAuth
-import { Textarea } from '@/components/ui/textarea'; // Import Textarea
-import { useToast } from '@/hooks/use-toast'; // Import useToast
-import { validateCommentData, validateRatingData } from '@/services/validationService'; // Import validation function
-import { fetchStoryDetails, submitStoryComment, submitStoryRating, toggleLibraryStatus } from '@/lib/storyService'; // Import story-specific services
-import type { Timestamp } from 'firebase/firestore'; // Import Timestamp type
+import { BookOpen, Eye, Users, MessageSquare, ThumbsUp, List, PlusCircle, Library, CheckCircle, Star, Share2, Send, Loader2 } from 'lucide-react';
+import type { Story as BaseStory } from '@/components/story/story-card';
+import React, { useEffect, useState, Suspense, use } from 'react'; // Import use
+import { useAuth } from '@/hooks/use-auth';
+import { Textarea } from '@/components/ui/textarea';
+import { useToast } from '@/hooks/use-toast';
+import { validateCommentData, validateRatingData } from '@/services/validationService';
+import { fetchStoryDetails, submitStoryComment, submitStoryRating, toggleLibraryStatus } from '@/lib/storyService';
+import type { Timestamp } from 'firebase/firestore';
 
-
-// Re-type BaseStory author to be an object
 interface Author {
     name: string;
-    id: string; // Assuming an ID for linking later
-    avatarUrl?: string; // Optional avatar URL
+    id: string;
+    avatarUrl?: string;
 }
 
-// Define the shape of a comment for story page
 interface StoryCommentData {
     id: string;
     userId: string;
     userName: string;
     userAvatar?: string | null;
     text: string;
-    timestamp: Date; // Use Date object
+    timestamp: Date;
 }
 
-// Define extended Story type for this page
-interface StoryDetails extends Omit<BaseStory, 'author' | 'chapters' | 'lastUpdated'> {
-  id: string; // Ensure StoryDetails also has an id
-  author: Author; // Use the Author interface
+// Define extended Story type for this page, including all fields from BaseStory
+interface StoryDetails extends Omit<BaseStory, 'author' | 'chapters' | 'lastUpdated' | 'status'> {
+  id: string;
+  author: Author;
   chaptersData: { id: string; title: string; order: number }[];
-  authorFollowers: number; // Example additional data
-  status: 'Draft' | 'Published' | 'Archived' | 'Ongoing' | 'Completed'; // Use specific status type // Adjusted status type
-  lastUpdated: string; // Keep as string for consistency
+  authorFollowers: number;
+  status: 'Draft' | 'Published' | 'Archived' | 'Ongoing' | 'Completed';
+  lastUpdated: string;
   averageRating?: number;
   totalRatings?: number;
-  chapters: number; // Add chapters count
+  chapters: number; // Explicit chapters count
   comments?: StoryCommentData[];
-  userRating?: number; // User's overall rating for this story
+  userRating?: number;
   isInLibrary?: boolean;
 }
 
-interface StoryPageProps {
-  params: {
-    slug: string;
-  };
+// Define the shape of the resolved params
+interface StoryPageResolvedParams {
+  slug: string;
 }
 
-const StoryDetailPage: NextPage<StoryPageProps> = ({ params }) => {
+// params prop is now a Promise
+interface StoryPageProps {
+  params: Promise<StoryPageResolvedParams>;
+}
+
+
+const StoryDetailPage: NextPage<StoryPageProps> = (props) => {
+  const resolvedParams = use(props.params); // Unwrap the promise
+  const { slug } = resolvedParams; // Get slug from the resolved object
+
   const { user, isLoading: authLoading } = useAuth();
   const { toast } = useToast();
   const [story, setStory] = useState<StoryDetails | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [commentText, setCommentText] = useState('');
-  const [rating, setRating] = useState(0); // User's overall story rating selection
+  const [rating, setRating] = useState(0);
   const [isInLibrary, setIsInLibrary] = useState(false);
   const [isSubmittingComment, setIsSubmittingComment] = useState(false);
   const [isSubmittingRating, setIsSubmittingRating] = useState(false);
@@ -74,10 +79,10 @@ const StoryDetailPage: NextPage<StoryPageProps> = ({ params }) => {
 
   useEffect(() => {
     const fetchStory = async () => {
+      if (!slug) return; // Don't fetch if slug isn't resolved yet
       setIsLoading(true);
       try {
-        // Pass userId if available to check library status and user rating
-        const data = await fetchStoryDetails(params.slug, user?.id);
+        const data = await fetchStoryDetails(slug, user?.id);
         setStory(data);
         setRating(data?.userRating || 0);
         setIsInLibrary(data?.isInLibrary || false);
@@ -94,11 +99,11 @@ const StoryDetailPage: NextPage<StoryPageProps> = ({ params }) => {
         setIsLoading(false);
       }
     };
-    // Fetch only when auth state is resolved or changes
-    if (!authLoading) {
+    // Fetch only when auth state is resolved AND slug is available
+    if (!authLoading && slug) {
       fetchStory();
     }
-  }, [params.slug, authLoading, user?.id, toast]); // Re-fetch if user changes
+  }, [slug, authLoading, user?.id, toast]);
 
 
   const handleCommentSubmit = async () => {
@@ -119,14 +124,13 @@ const StoryDetailPage: NextPage<StoryPageProps> = ({ params }) => {
         userId: user.id,
         text: commentText,
       });
-       // Add the new comment to the local state immediately for optimistic update
       setComments(prevComments => [{
-          id: newComment.id, // Use the ID returned from the service
+          id: newComment.id,
           userId: user.id,
           userName: user.name || 'User',
           userAvatar: user.avatarUrl,
           text: commentText,
-          timestamp: new Date() // Use current time for optimistic update
+          timestamp: new Date()
       }, ...prevComments]);
       toast({ title: "Comment Posted", description: "Your comment has been added." });
       setCommentText('');
@@ -151,7 +155,7 @@ const StoryDetailPage: NextPage<StoryPageProps> = ({ params }) => {
 
     setIsSubmittingRating(true);
     const previousRating = rating;
-    setRating(newRating); // Optimistic UI update
+    setRating(newRating);
 
     try {
       await submitStoryRating({
@@ -160,11 +164,10 @@ const StoryDetailPage: NextPage<StoryPageProps> = ({ params }) => {
         rating: newRating,
       });
       toast({ title: "Rating Submitted", description: `You rated this story ${newRating} stars.` });
-      // Optionally, re-fetch story data to get updated average rating, or update locally if API returns it
     } catch (error) {
       console.error("Error submitting story rating:", error);
       toast({ title: "Error Submitting Rating", description: "Could not save your rating. Please try again.", variant: "destructive" });
-      setRating(previousRating); // Revert optimistic update
+      setRating(previousRating);
     } finally {
       setIsSubmittingRating(false);
     }
@@ -214,15 +217,15 @@ const StoryDetailPage: NextPage<StoryPageProps> = ({ params }) => {
     }
     setIsTogglingLibrary(true);
     const previousLibraryStatus = isInLibrary;
-    setIsInLibrary(!isInLibrary); // Optimistic UI update
+    setIsInLibrary(!isInLibrary);
 
     try {
-      await toggleLibraryStatus(user.id, story.id, !previousLibraryStatus); // Send the action to perform
+      await toggleLibraryStatus(user.id, story.id, !previousLibraryStatus);
       toast({ title: `Story ${!previousLibraryStatus ? 'Added To' : 'Removed From'} Library` });
     } catch (error) {
       console.error("Error toggling library status:", error);
       toast({ title: "Library Error", description: "Could not update your library. Please try again.", variant: "destructive" });
-      setIsInLibrary(previousLibraryStatus); // Revert optimistic update
+      setIsInLibrary(previousLibraryStatus);
     } finally {
       setIsTogglingLibrary(false);
     }
@@ -233,7 +236,7 @@ const StoryDetailPage: NextPage<StoryPageProps> = ({ params }) => {
   }
 
   if (!story) {
-    return <div className="text-center py-20">Story not found.</div>;
+    return <div className="text-center py-20">Story not found or failed to load.</div>;
   }
 
   const displayRating = story.averageRating ? story.averageRating.toFixed(1) : 'N/A';
@@ -247,12 +250,12 @@ const StoryDetailPage: NextPage<StoryPageProps> = ({ params }) => {
           <Card className="overflow-hidden shadow-lg border border-border/80">
             <div className="relative aspect-[2/3] w-full">
               <Image
-                src={story.coverImageUrl || `https://picsum.photos/seed/${story.slug}/400/600`} // Fallback image
+                src={story.coverImageUrl || `https://picsum.photos/seed/${slug}/400/600`}
                 alt={`Cover for ${story.title}`}
                 fill
                 sizes="(max-width: 1024px) 100vw, 33vw"
                 className="object-cover"
-                {...(story.coverImageUrl && { priority: true })} // Prioritize loading cover image if present
+                priority // LCP candidate
                 data-ai-hint={story.dataAiHint || "book cover story detail"}
               />
             </div>
@@ -260,7 +263,7 @@ const StoryDetailPage: NextPage<StoryPageProps> = ({ params }) => {
 
           <div className="flex flex-col gap-3">
             <Button size="lg" asChild className="w-full bg-primary text-primary-foreground hover:bg-primary/90 text-base font-semibold">
-              <Link href={`/read/${story.slug}/1`}>
+              <Link href={`/read/${slug}/1`}>
                 <BookOpen className="mr-2 h-5 w-5" /> Read First Chapter
               </Link>
             </Button>
@@ -307,7 +310,6 @@ const StoryDetailPage: NextPage<StoryPageProps> = ({ params }) => {
                 <span className="text-muted-foreground font-medium flex items-center gap-2"><Star className="w-4 h-4" /> Rating</span>
                 <div className="flex items-center gap-1">
                   <span className="font-bold">{displayRating}</span>
-                   {/* Display star icons based on average rating */}
                    {story.averageRating && (
                       <div className="flex">
                           {[...Array(5)].map((_, i) => (
@@ -372,7 +374,7 @@ const StoryDetailPage: NextPage<StoryPageProps> = ({ params }) => {
           <div className="flex items-center gap-3">
             <Link href={`/user/${story.author.id}`} className="flex items-center gap-3 group">
               <Avatar className="h-11 w-11 border-2 border-border group-hover:border-primary transition-colors">
-                <AvatarImage src={story.author.avatarUrl || `https://picsum.photos/seed/${story.author.name}/100/100`} alt={story.author.name} data-ai-hint="author profile picture large" />
+                <AvatarImage src={story.author.avatarUrl || `https://picsum.photos/seed/${story.author.name}/100/100`} alt={story.author.name} data-ai-hint="author avatar large" />
                 <AvatarFallback>{story.author.name.substring(0, 1).toUpperCase()}</AvatarFallback>
               </Avatar>
               <div>
@@ -381,7 +383,7 @@ const StoryDetailPage: NextPage<StoryPageProps> = ({ params }) => {
               </div>
             </Link>
             {user && user.id !== story.author.id && (
-              <Button variant="outline" size="sm" className="ml-4" disabled>Follow</Button> // Follow button disabled for now
+              <Button variant="outline" size="sm" className="ml-4" disabled>Follow</Button>
             )}
           </div>
           <div className="flex items-center gap-2 pt-2">
@@ -422,7 +424,7 @@ const StoryDetailPage: NextPage<StoryPageProps> = ({ params }) => {
             <ul className="divide-y divide-border/60">
               {story.chaptersData.map((chapter) => (
                 <li key={chapter.id}>
-                  <Link href={`/read/${story.slug}/${chapter.order}`} className="flex justify-between items-center p-4 hover:bg-secondary transition-colors duration-150 group">
+                  <Link href={`/read/${slug}/${chapter.order}`} className="flex justify-between items-center p-4 hover:bg-secondary transition-colors duration-150 group">
                     <span className="font-medium group-hover:text-primary">{chapter.order}. {chapter.title}</span>
                     <span className="text-sm text-muted-foreground"></span>
                   </Link>
@@ -442,7 +444,7 @@ const StoryDetailPage: NextPage<StoryPageProps> = ({ params }) => {
             {user ? (
               <div className="flex gap-3 items-start">
                 <Avatar className="mt-1">
-                  <AvatarImage src={user.avatarUrl || undefined} alt={user.name || 'User'} data-ai-hint="user avatar comment" />
+                  <AvatarImage src={user.avatarUrl || undefined} alt={user.name || 'User'} data-ai-hint="user profile avatar" />
                   <AvatarFallback>{user.name?.substring(0, 1).toUpperCase() || 'U'}</AvatarFallback>
                 </Avatar>
                 <div className="flex-1 space-y-2">
@@ -501,4 +503,3 @@ const SuspendedStoryDetailPage: NextPage<StoryPageProps> = (props) => (
 
 
 export default SuspendedStoryDetailPage;
-
