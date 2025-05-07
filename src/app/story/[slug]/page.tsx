@@ -34,6 +34,7 @@ import { useToast } from '@/hooks/use-toast';
 import { validateCommentData, validateRatingData } from '@/services/validationService';
 import { fetchStoryDetails, submitStoryComment, submitStoryRating, toggleLibraryStatus } from '@/lib/storyService';
 import type { Timestamp } from 'firebase/firestore';
+import { Skeleton } from '@/components/ui/skeleton'; // Import Skeleton
 
 // Define the Story type again for clarity, aligning with `storyService` expectations
 // Ensure this aligns with the structure returned by fetchStoryDetails
@@ -41,6 +42,7 @@ interface Author {
     name: string;
     id: string;
     avatarUrl?: string;
+    // followers?: number; // Example if you fetch this
 }
 
 interface StoryCommentData {
@@ -60,6 +62,7 @@ interface ChapterSummary {
     lastUpdated?: string; // ISO string
 }
 
+// This should match the one in the page component
 interface StoryDetailsResult {
     id: string;
     title: string;
@@ -94,9 +97,9 @@ interface StoryPageProps {
 }
 
 const StoryDetailPage: NextPage<StoryPageProps> = (props) => {
-    const resolvedParams = use(props.params);
+    // --- Hooks and State ---
+    const resolvedParams = use(props.params); // Unwrap the promise
     const { slug } = resolvedParams;
-
     const { user, isLoading: authLoading } = useAuth();
     const { toast } = useToast();
     const [story, setStory] = useState<StoryDetailsResult | null>(null);
@@ -109,11 +112,13 @@ const StoryDetailPage: NextPage<StoryPageProps> = (props) => {
     const [isTogglingLibrary, setIsTogglingLibrary] = useState(false);
     const [comments, setComments] = useState<StoryCommentData[]>([]);
 
+    // --- Data Fetching ---
     useEffect(() => {
         const fetchStory = async () => {
             if (!slug) return;
             setIsLoading(true);
             try {
+                // Pass userId if available to check library status and user rating
                 const data = await fetchStoryDetails(slug, user?.id);
                 setStory(data);
                 setRating(data?.userRating || 0);
@@ -131,11 +136,12 @@ const StoryDetailPage: NextPage<StoryPageProps> = (props) => {
                 setIsLoading(false);
             }
         };
-        if (!authLoading && slug) {
+        if (!authLoading && slug) { // Fetch only when auth is resolved and slug is present
             fetchStory();
         }
-    }, [slug, user?.id, authLoading, toast]);
+    }, [slug, user?.id, authLoading, toast]); // Dependency array
 
+    // --- Handlers ---
     const handleCommentSubmit = async () => {
         if (!user || !story) {
             toast({ title: "Login Required", description: "Please log in to leave a comment.", variant: "destructive" });
@@ -153,16 +159,17 @@ const StoryDetailPage: NextPage<StoryPageProps> = (props) => {
                 userId: user.id,
                 text: commentText,
             });
+            // Optimistically update comments state
             setComments(prevComments => [{
                 id: newComment.id,
                 userId: user.id,
-                userName: user.name || 'User',
+                userName: user.name || 'User', // Use display name or fallback
                 userAvatar: user.avatarUrl,
                 text: commentText,
-                timestamp: new Date()
+                timestamp: new Date() // Use client time for immediate feedback
             }, ...prevComments]);
             toast({ title: "Comment Posted", description: "Your comment has been added." });
-            setCommentText('');
+            setCommentText(''); // Clear input field
         } catch (error) {
             console.error("Error submitting story comment:", error);
             toast({ title: "Error Posting Comment", description: "Could not post your comment. Please try again later.", variant: "destructive" });
@@ -183,7 +190,7 @@ const StoryDetailPage: NextPage<StoryPageProps> = (props) => {
         }
         setIsSubmittingRating(true);
         const previousRating = rating;
-        setRating(newRating);
+        setRating(newRating); // Optimistic update
         try {
             await submitStoryRating({
                 storyId: story.id,
@@ -191,17 +198,26 @@ const StoryDetailPage: NextPage<StoryPageProps> = (props) => {
                 rating: newRating,
             });
             toast({ title: "Rating Submitted", description: `You rated this story ${newRating} stars.` });
-            // Re-fetch story details to update average rating display
-            fetchStoryDetails(slug, user?.id).then(data => {
-                if (data) setStory(data);
-            });
+            // Optionally re-fetch story details to update average rating display accurately
+            // fetchStoryDetails(slug, user?.id).then(data => { if(data) setStory(data); });
         } catch (error) {
             console.error("Error submitting story rating:", error);
             toast({ title: "Error Submitting Rating", description: "Could not save your rating. Please try again.", variant: "destructive" });
-            setRating(previousRating);
+            setRating(previousRating); // Revert optimistic update on error
         } finally {
             setIsSubmittingRating(false);
         }
+    };
+
+    const handleCopyUrl = () => {
+        if (!story) return;
+        const storyUrl = window.location.href;
+        navigator.clipboard.writeText(storyUrl)
+            .then(() => toast({ title: "Copied!", description: "Story URL copied to clipboard." }))
+            .catch(error => {
+                console.error("Failed to copy story URL:", error);
+                toast({ title: "Error", description: "Failed to copy URL.", variant: "destructive" });
+            });
     };
 
     const handleShareStory = async (platform: 'web' | 'facebook' | 'twitter' | 'copy') => {
@@ -239,17 +255,6 @@ const StoryDetailPage: NextPage<StoryPageProps> = (props) => {
         }
     };
 
-    const handleCopyUrl = () => {
-        if (!story) return;
-        const storyUrl = window.location.href;
-        navigator.clipboard.writeText(storyUrl)
-            .then(() => toast({ title: "Copied!", description: "Story URL copied to clipboard." }))
-            .catch(error => {
-                console.error("Failed to copy story URL:", error);
-                toast({ title: "Error", description: "Failed to copy URL.", variant: "destructive" });
-            });
-    };
-
     const handleToggleLibrary = async () => {
         if (!user || !story || isTogglingLibrary) {
             if (!user) toast({ title: "Login Required", description: "Please log in to manage your library.", variant: "destructive" });
@@ -257,19 +262,20 @@ const StoryDetailPage: NextPage<StoryPageProps> = (props) => {
         }
         setIsTogglingLibrary(true);
         const previousLibraryStatus = isInLibrary;
-        setIsInLibrary(!isInLibrary);
+        setIsInLibrary(!isInLibrary); // Optimistic update
         try {
             await toggleLibraryStatus(user.id, story.id, !previousLibraryStatus);
             toast({ title: `Story ${!previousLibraryStatus ? 'Added To' : 'Removed From'} Library` });
         } catch (error) {
             console.error("Error toggling library status:", error);
             toast({ title: "Library Error", description: "Could not update your library. Please try again.", variant: "destructive" });
-            setIsInLibrary(previousLibraryStatus);
+            setIsInLibrary(previousLibraryStatus); // Revert on error
         } finally {
             setIsTogglingLibrary(false);
         }
     };
 
+    // --- Render Logic ---
     if (isLoading || authLoading) {
         return <div className="flex items-center justify-center min-h-[calc(100vh-10rem)]"><Loader2 className="h-12 w-12 animate-spin text-primary" /></div>;
     }
@@ -279,6 +285,11 @@ const StoryDetailPage: NextPage<StoryPageProps> = (props) => {
     }
 
     const displayRating = story.averageRating ? story.averageRating.toFixed(1) : 'N/A';
+
+    // Custom summary for Dil Ke Raaste
+    const dilKeRaasteSummary = `Dil Ke Raaste ek dil ko chhoo lene wali romantic kahani hai jo Anaya, ek kalpnik aur pratibhashali ladki, aur Aarav, ek safal lekin thoda reserved vyapari, ke beech ke rishton par adharit hai. Jab unke parivaron ke beech ek achanak rishta tay hota hai, to dono ki zindagi ek naye mod par aa jati hai.
+
+Yeh kahani parivaarik ummeedein, samajik dabav aur vyakti ke sapno ke beech pyaar, vishwas aur samarpan ki yatra hai.`;
 
     return (
         <div className="container mx-auto py-6 md:py-10">
@@ -308,12 +319,41 @@ const StoryDetailPage: NextPage<StoryPageProps> = (props) => {
              )}
 
 
+            {/* Rating and Social Share (Added below image) */}
+            <section className="mb-8 md:mb-12 flex flex-col items-center gap-4">
+                 {/* Story Rating */}
+                  <div className="flex items-center gap-1 pt-1">
+                      {[1, 2, 3, 4, 5].map((starVal) => (
+                           <Button
+                              key={starVal} variant="ghost" size="icon"
+                              onClick={() => handleRateStory(starVal)}
+                              disabled={!user || isSubmittingRating}
+                              className={`p-1 h-auto w-auto ${!user ? 'cursor-not-allowed opacity-60' : ''}`}
+                              aria-label={`Rate story ${starVal} stars`}
+                           >
+                               <Star className={`h-7 w-7 transition-colors ${starVal <= rating ? 'fill-primary text-primary' : 'text-muted-foreground/40'} ${user ? 'hover:text-primary/70' : ''}`} />
+                           </Button>
+                       ))}
+                       {isSubmittingRating && <Loader2 className="h-6 w-6 animate-spin text-muted-foreground ml-3" />}
+                       <span className="text-sm text-muted-foreground ml-2">({displayRating})</span>
+                   </div>
+                   {!user && <p className="text-sm text-muted-foreground"><Link href="/login" className="text-primary underline">Log in</Link> to rate.</p>}
+
+                   {/* Share Section */}
+                   <div className="flex flex-wrap justify-center gap-3">
+                       <Button variant="outline" size="sm" onClick={() => handleShareStory('twitter')}><Twitter className="mr-2 h-4 w-4"/> Twitter/X</Button>
+                       <Button variant="outline" size="sm" onClick={() => handleShareStory('facebook')}><Facebook className="mr-2 h-4 w-4"/> Facebook</Button>
+                       <Button variant="outline" size="sm" onClick={() => handleShareStory('copy')}><Copy className="mr-2 h-4 w-4"/> Copy Link</Button>
+                       {typeof window !== 'undefined' && navigator.share && ( // Check if navigator is available
+                           <Button variant="outline" size="sm" onClick={() => handleShareStory('web')}><Share2 className="mr-2 h-4 w-4" /> More...</Button>
+                       )}
+                   </div>
+            </section>
+
             {/* Main Layout Grid */}
             <div className="grid grid-cols-1 md:grid-cols-12 gap-6 md:gap-8">
                 {/* Left Column: Actions, Meta */}
                 <aside className="md:col-span-4 lg:col-span-3 space-y-6">
-                    {/* Removed duplicate cover image card */}
-
                     <div className="space-y-3 sticky top-20">
                         <Button size="lg" asChild className="w-full bg-primary text-primary-foreground hover:bg-primary/90 text-base font-semibold shadow-md">
                             <Link href={`/read/${slug}/1`}>
@@ -389,9 +429,17 @@ const StoryDetailPage: NextPage<StoryPageProps> = (props) => {
                 {/* Right Column: Summary, Chapters, Author, Comments */}
                 <main className="md:col-span-8 lg:col-span-9 space-y-8">
                     <Card>
-                        <CardHeader><CardTitle className="text-xl font-semibold">Summary</CardTitle></CardHeader>
+                        <CardHeader><CardTitle className="text-xl font-semibold">Story Summary</CardTitle></CardHeader>
                         <CardContent className="prose dark:prose-invert max-w-none">
-                            <p className="text-base leading-relaxed whitespace-pre-line">{story.description}</p>
+                           {/* Conditional rendering for Dil Ke Raaste */}
+                            {story.slug === 'dil-ke-raaste' ? (
+                               <div className="text-base leading-relaxed whitespace-pre-line">
+                                   <p>Dil Ke Raaste ek dil ko chhoo lene wali romantic kahani hai jo Anaya, ek kalpnik aur pratibhashali ladki, aur Aarav, ek safal lekin thoda reserved vyapari, ke beech ke rishton par adharit hai. Jab unke parivaron ke beech ek achanak rishta tay hota hai, to dono ki zindagi ek naye mod par aa jati hai.</p>
+                                   <p>Yeh kahani parivaarik ummeedein, samajik dabav aur vyakti ke sapno ke beech pyaar, vishwas aur samarpan ki yatra hai.</p>
+                               </div>
+                           ) : (
+                               <p className="text-base leading-relaxed whitespace-pre-line">{story.description}</p>
+                           )}
                         </CardContent>
                     </Card>
 
@@ -423,42 +471,21 @@ const StoryDetailPage: NextPage<StoryPageProps> = (props) => {
                         </CardHeader>
                         <CardContent className="p-0 max-h-[400px] overflow-y-auto">
                             <ul className="divide-y">
-                                {story.chaptersData.map((chapter, index) => (
+                                {story.chaptersData.length > 0 ? (
+                                  story.chaptersData.map((chapter, index) => (
                                     <li key={chapter.id}>
                                         <Link href={`/read/${slug}/${chapter.order}`} className="flex justify-between items-center p-4 hover:bg-secondary/50 transition-colors duration-150 group">
                                             <span className="font-medium group-hover:text-primary">{chapter.order}. {chapter.title}</span>
-                                            <span className="text-xs text-muted-foreground">{/* Add word count or date later */}</span>
+                                            <span className="text-xs text-muted-foreground">{chapter.wordCount ? `${chapter.wordCount.toLocaleString()} words` : ''}</span>
                                         </Link>
                                     </li>
-                                ))}
-                                {story.chaptersData.length === 0 && (
+                                ))
+                                ) : (
                                     <li className="p-6 text-center text-muted-foreground italic">No chapters published yet.</li>
                                 )}
                             </ul>
                         </CardContent>
                     </Card>
-
-                     {/* Your Rating for the Story */}
-                     <Card>
-                         <CardHeader><CardTitle className="text-xl font-semibold">Rate This Story</CardTitle></CardHeader>
-                         <CardContent>
-                             <div className="flex items-center gap-1 pt-1">
-                                {[1, 2, 3, 4, 5].map((starVal) => (
-                                     <Button
-                                        key={starVal} variant="ghost" size="icon"
-                                        onClick={() => handleRateStory(starVal)}
-                                        disabled={!user || isSubmittingRating}
-                                        className={`p-1 h-auto w-auto ${!user ? 'cursor-not-allowed opacity-60' : ''}`}
-                                        aria-label={`Rate story ${starVal} stars`}
-                                     >
-                                         <Star className={`h-7 w-7 transition-colors ${starVal <= rating ? 'fill-primary text-primary' : 'text-muted-foreground/40'} ${user ? 'hover:text-primary/70' : ''}`} />
-                                     </Button>
-                                 ))}
-                                 {isSubmittingRating && <Loader2 className="h-6 w-6 animate-spin text-muted-foreground ml-3" />}
-                             </div>
-                             {!user && <p className="text-sm text-muted-foreground mt-2"><Link href="/login" className="text-primary underline">Log in</Link> to rate.</p>}
-                         </CardContent>
-                     </Card>
 
 
                      {/* Story Comments */}
@@ -500,7 +527,7 @@ const StoryDetailPage: NextPage<StoryPageProps> = (props) => {
                                 {comments.length === 0 && !user && (
                                     <p className="text-center text-sm text-muted-foreground italic py-4">No comments yet.</p>
                                 )}
-                                {comments.map((comment) => (
+                                {comments.length > 0 && comments.map((comment) => (
                                    <div key={comment.id} className="flex gap-3 items-start">
                                        <Link href={`/profile/${comment.userId}`}>
                                           <Avatar className="h-9 w-9">
@@ -521,29 +548,53 @@ const StoryDetailPage: NextPage<StoryPageProps> = (props) => {
                        </CardContent>
                    </Card>
 
-                   {/* Share Section */}
-                    <Card>
-                        <CardHeader>
-                            <CardTitle className="text-xl font-semibold flex items-center gap-2"><Share2 className="w-5 h-5"/> Share Story</CardTitle>
-                        </CardHeader>
-                        <CardContent className="flex flex-wrap gap-3">
-                            <Button variant="outline" onClick={() => handleShareStory('twitter')}><Twitter className="mr-2 h-4 w-4"/> Twitter/X</Button>
-                            <Button variant="outline" onClick={() => handleShareStory('facebook')}><Facebook className="mr-2 h-4 w-4"/> Facebook</Button>
-                            <Button variant="outline" onClick={() => handleShareStory('copy')}><Copy className="mr-2 h-4 w-4"/> Copy Link</Button>
-                            {typeof window !== 'undefined' && navigator.share && ( // Check if navigator is available
-                                <Button variant="outline" onClick={() => handleShareStory('web')}><Share2 className="mr-2 h-4 w-4" /> More...</Button>
-                            )}
-                        </CardContent>
-                    </Card>
-
                 </main>
             </div>
         </div>
     );
 };
 
+// Loader component for Suspense boundary
+const StoryDetailLoader: React.FC = () => (
+     <div className="container mx-auto py-6 md:py-10">
+        <section className="mb-8 md:mb-12 text-center space-y-3">
+           <Skeleton className="h-10 w-3/4 mx-auto" />
+           <Skeleton className="h-6 w-1/4 mx-auto" />
+        </section>
+         <section className="mb-8 md:mb-12 flex justify-center">
+            <Skeleton className="w-full max-w-xs sm:max-w-sm md:max-w-md aspect-[2/3] rounded-lg" />
+         </section>
+         <section className="mb-8 md:mb-12 flex flex-col items-center gap-4">
+              <Skeleton className="h-10 w-48" />
+               <div className="flex gap-3">
+                   <Skeleton className="h-8 w-24" />
+                   <Skeleton className="h-8 w-24" />
+                   <Skeleton className="h-8 w-24" />
+               </div>
+          </section>
+
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-6 md:gap-8">
+              <aside className="md:col-span-4 lg:col-span-3 space-y-6">
+                  <div className="space-y-3 sticky top-20">
+                      <Skeleton className="h-12 w-full" />
+                      <Skeleton className="h-12 w-full" />
+                  </div>
+                   <Card><CardContent className="p-4 space-y-3"><Skeleton className="h-5 w-full" /><Skeleton className="h-5 w-full" /><Skeleton className="h-5 w-full" /></CardContent></Card>
+                   <Card><CardContent className="p-4"><Skeleton className="h-6 w-1/2" /></CardContent></Card>
+               </aside>
+              <main className="md:col-span-8 lg:col-span-9 space-y-8">
+                  <Card><CardHeader><Skeleton className="h-6 w-1/4" /></CardHeader><CardContent><Skeleton className="h-20 w-full" /></CardContent></Card>
+                  <Card><CardHeader><Skeleton className="h-6 w-1/4" /></CardHeader><CardContent className="flex items-center gap-4"><Skeleton className="h-16 w-16 rounded-full" /><div className="space-y-2"><Skeleton className="h-5 w-32" /><Skeleton className="h-4 w-24" /></div></CardContent></Card>
+                   <Card><CardHeader><Skeleton className="h-6 w-1/3" /></CardHeader><CardContent className="space-y-2"><Skeleton className="h-10 w-full" /><Skeleton className="h-10 w-full" /><Skeleton className="h-10 w-full" /></CardContent></Card>
+                   <Card><CardHeader><Skeleton className="h-6 w-1/4" /></CardHeader><CardContent className="space-y-4"><Skeleton className="h-24 w-full" /><Skeleton className="h-10 w-full" /><Skeleton className="h-10 w-full" /></CardContent></Card>
+               </main>
+          </div>
+     </div>
+ );
+
+
 const SuspendedStoryDetailPage: NextPage<StoryPageProps> = (props) => (
-    <Suspense fallback={<div className="flex items-center justify-center min-h-[calc(100vh-10rem)]"><Loader2 className="h-12 w-12 animate-spin text-primary" /></div>}>
+    <Suspense fallback={<StoryDetailLoader />}>
         <StoryDetailPage {...props} />
     </Suspense>
 );
