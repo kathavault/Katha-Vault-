@@ -1,4 +1,3 @@
-
 import type { NextPage } from 'next';
 import StoryCard, { type Story } from '@/components/story/story-card';
 import { Button } from '@/components/ui/button';
@@ -172,7 +171,7 @@ const shortStories: Story[] = [
     title: 'Dil Ke Raaste',
     author: 'Katha Vault',
     description: 'Ek anokhi prem kahani jo dil ke raaston se hokar guzarti hai, jahan har mod par ek nayi ummeed hai.',
-    coverImageUrl: 'https://picsum.photos/seed/dil-ke-raaste-love/400/600', // Placeholder image
+    coverImageUrl: 'https://i.imgur.com/your-new-image-url.png', // New cover image URL
     genre: 'Romance',
     reads: 15250,
     chapters: 10, // Short stories have fewer chapters
@@ -316,3 +315,4 @@ const Home: NextPage = () => {
 };
 
 export default Home;
+
