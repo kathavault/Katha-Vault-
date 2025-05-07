@@ -11,13 +11,14 @@ const mockStories: Story[] = [
     title: 'The Crimson Cipher',
     author: 'Alex Quill',
     description: 'A thrilling adventure into the unknown depths of ancient ruins, where secrets lie buried.',
-    coverImageUrl: 'https://picsum.photos/seed/crimson/400/600',
+    // If you have a specific cover image for "The Crimson Cipher", replace the URL below.
+    coverImageUrl: 'YOUR_NOVEL_COVER_IMAGE_URL_HERE', // Replace this with the actual URL of your novel cover
     genre: 'Adventure',
     reads: 12567,
     chapters: 25,
     tags: ['Mystery', 'Action', 'Ancient'],
     slug: 'the-crimson-cipher',
-    dataAiHint: 'adventure mystery book cover',
+    dataAiHint: 'adventure mystery book cover', // You can also update this hint if you change the image
   },
   {
     id: '2',
@@ -256,3 +257,4 @@ const Home: NextPage = () => {
 };
 
 export default Home;
+
