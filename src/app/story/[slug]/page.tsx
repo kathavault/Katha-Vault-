@@ -23,8 +23,8 @@ import {
     Facebook,
     Copy,
     MessageSquare,
-    Bookmark, // New icon for library
-    Heart, // Placeholder for follow author
+    Bookmark,
+    Heart,
 } from 'lucide-react';
 import type { Story as BaseStory } from '@/components/story/story-card';
 import React, { useEffect, useState, Suspense, use } from 'react';
@@ -35,12 +35,12 @@ import { validateCommentData, validateRatingData } from '@/services/validationSe
 import { fetchStoryDetails, submitStoryComment, submitStoryRating, toggleLibraryStatus } from '@/lib/storyService';
 import type { Timestamp } from 'firebase/firestore';
 
+// Define the Story type again for clarity, aligning with `storyService` expectations
+// Ensure this aligns with the structure returned by fetchStoryDetails
 interface Author {
     name: string;
     id: string;
     avatarUrl?: string;
-    // bio?: string; // Optional: if fetched
-    // followers?: number; // Optional: if fetched
 }
 
 interface StoryCommentData {
@@ -52,21 +52,37 @@ interface StoryCommentData {
     timestamp: Date;
 }
 
-interface StoryDetails extends Omit<BaseStory, 'author' | 'chapters' | 'lastUpdated' | 'status'> {
+interface ChapterSummary {
     id: string;
-    author: Author;
-    chaptersData: { id: string; title: string; order: number; wordCount?: number; lastUpdated?: string }[]; // Added more chapter details
-    authorFollowers: number;
+    title: string;
+    order: number;
+    wordCount?: number;
+    lastUpdated?: string; // ISO string
+}
+
+interface StoryDetailsResult {
+    id: string;
+    title: string;
+    description: string;
+    genre: string;
+    tags: string[];
     status: 'Draft' | 'Published' | 'Archived' | 'Ongoing' | 'Completed';
-    lastUpdated: string;
+    authorId: string;
+    authorName: string; // Ensure this is fetched
+    coverImageUrl?: string;
+    reads?: number;
+    author: Author;
+    authorFollowers: number;
+    chapters: number; // Explicit chapters count
+    chaptersData: ChapterSummary[];
+    lastUpdated: string; // ISO string for consistency
     averageRating?: number;
     totalRatings?: number;
-    chapters: number; // Explicit chapters count
     comments?: StoryCommentData[];
     userRating?: number;
     isInLibrary?: boolean;
-    // Add any other fields fetched by storyService
-    // Example: totalVotes if different from totalRatings
+    slug: string;
+    dataAiHint?: string;
 }
 
 interface StoryPageResolvedParams {
@@ -83,7 +99,7 @@ const StoryDetailPage: NextPage<StoryPageProps> = (props) => {
 
     const { user, isLoading: authLoading } = useAuth();
     const { toast } = useToast();
-    const [story, setStory] = useState<StoryDetails | null>(null);
+    const [story, setStory] = useState<StoryDetailsResult | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [commentText, setCommentText] = useState('');
     const [rating, setRating] = useState(0);
@@ -266,35 +282,39 @@ const StoryDetailPage: NextPage<StoryPageProps> = (props) => {
 
     return (
         <div className="container mx-auto py-6 md:py-10">
-            {/* Header Section - Simplified */}
-            <section className="relative mb-8 md:mb-12 text-center">
-                {/* Optional: Background image or color block */}
-                <div className="absolute inset-0 opacity-10 bg-gradient-to-b from-primary/20 to_transparent -z-10"></div>
+            {/* Header Section - Title and Author */}
+            <section className="mb-8 md:mb-12 text-center">
                 <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold leading-tight text-foreground mb-2">{story.title}</h1>
                 <div className="text-lg text-muted-foreground">
                     by <Link href={`/profile/${story.author.id}`} className="text-primary hover:underline font-medium">{story.author.name}</Link>
                 </div>
             </section>
 
+            {/* Cover Image Section */}
+            {story.coverImageUrl && (
+                 <section className="mb-8 md:mb-12 flex justify-center">
+                     <div className="relative w-full max-w-xs sm:max-w-sm md:max-w-md aspect-[2/3] overflow-hidden rounded-lg shadow-lg border border-border/80">
+                         <Image
+                             src={story.coverImageUrl}
+                             alt={`Cover for ${story.title}`}
+                             fill
+                             sizes="(max-width: 640px) 80vw, (max-width: 768px) 40vw, 33vw"
+                             className="object-cover"
+                             priority // Consider making this dynamic if needed
+                             data-ai-hint={story.dataAiHint || "book cover story detail large"}
+                         />
+                     </div>
+                 </section>
+             )}
+
+
             {/* Main Layout Grid */}
             <div className="grid grid-cols-1 md:grid-cols-12 gap-6 md:gap-8">
-                {/* Left Column: Cover, Actions, Meta */}
+                {/* Left Column: Actions, Meta */}
                 <aside className="md:col-span-4 lg:col-span-3 space-y-6">
-                    <Card className="overflow-hidden shadow-lg border border-border/80 sticky top-20">
-                        <div className="relative aspect-[2/3] w-full">
-                            <Image
-                                src={story.coverImageUrl || `https://picsum.photos/seed/${slug}/400/600`}
-                                alt={`Cover for ${story.title}`}
-                                fill
-                                sizes="(max-width: 768px) 100vw, (max-width: 1024px) 33vw, 25vw"
-                                className="object-cover"
-                                priority // LCP candidate
-                                data-ai-hint={story.dataAiHint || "book cover story detail large"}
-                            />
-                        </div>
-                    </Card>
+                    {/* Removed duplicate cover image card */}
 
-                    <div className="space-y-3">
+                    <div className="space-y-3 sticky top-20">
                         <Button size="lg" asChild className="w-full bg-primary text-primary-foreground hover:bg-primary/90 text-base font-semibold shadow-md">
                             <Link href={`/read/${slug}/1`}>
                                 <BookOpen className="mr-2 h-5 w-5" /> Start Reading
@@ -510,7 +530,7 @@ const StoryDetailPage: NextPage<StoryPageProps> = (props) => {
                             <Button variant="outline" onClick={() => handleShareStory('twitter')}><Twitter className="mr-2 h-4 w-4"/> Twitter/X</Button>
                             <Button variant="outline" onClick={() => handleShareStory('facebook')}><Facebook className="mr-2 h-4 w-4"/> Facebook</Button>
                             <Button variant="outline" onClick={() => handleShareStory('copy')}><Copy className="mr-2 h-4 w-4"/> Copy Link</Button>
-                            {navigator.share && (
+                            {typeof window !== 'undefined' && navigator.share && ( // Check if navigator is available
                                 <Button variant="outline" onClick={() => handleShareStory('web')}><Share2 className="mr-2 h-4 w-4" /> More...</Button>
                             )}
                         </CardContent>
