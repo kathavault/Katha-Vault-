@@ -47,23 +47,29 @@ export function useAuth() {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser: FirebaseUser | null) => {
       setIsLoading(true); // Set loading true whenever auth state might change
       if (firebaseUser) {
-        // User is signed in
         let adminStatus = false;
+        console.log("onAuthStateChanged: User detected:", firebaseUser.email);
+
         try {
-          // Check for admin custom claim
           const idTokenResult = await firebaseUser.getIdTokenResult(true); // Force refresh token
-          adminStatus = !!idTokenResult.claims.admin; // Check if admin claim exists and is true
-          console.log("Admin claim found:", adminStatus); // Log for debugging
-        } catch (error) {
-            console.error("Error fetching custom claims:", error);
-            // Fallback check: Check if the email matches the hardcoded admin email
-            // This provides a secondary way to identify the admin if claims fail/aren't set.
+          if (idTokenResult.claims.admin === true) {
+            adminStatus = true;
+            console.log("onAuthStateChanged: Admin claim is true.");
+          } else {
+            console.log("onAuthStateChanged: Admin claim not explicitly true or not present. Value:", idTokenResult.claims.admin);
+            // If claim is not explicitly true, try email fallback
             if (firebaseUser.email === ADMIN_EMAIL) {
-                console.log("Admin email matched as fallback.");
-                adminStatus = true;
-            } else {
-                adminStatus = false;
+              console.log("onAuthStateChanged: Admin email matched as fallback because claim was not true.");
+              adminStatus = true;
             }
+          }
+        } catch (error) {
+          console.error("onAuthStateChanged: Error fetching custom claims:", error);
+          // Fallback to email check if claims fetch failed
+          if (firebaseUser.email === ADMIN_EMAIL) {
+            console.log("onAuthStateChanged: Admin email matched as fallback after claim fetch error.");
+            adminStatus = true;
+          }
         }
 
         const appUser: User = {
@@ -72,22 +78,23 @@ export function useAuth() {
           name: firebaseUser.displayName,
           avatarUrl: firebaseUser.photoURL,
           emailVerified: firebaseUser.emailVerified, // Get verification status
-          isAdmin: adminStatus, // Set based on custom claim or email fallback
+          isAdmin: adminStatus,
         };
         setUser(appUser);
-        setIsAdmin(adminStatus);
+        setIsAdmin(adminStatus); // This is the key state for the header
+        console.log("onAuthStateChanged: Final admin status for", firebaseUser.email, ":", adminStatus, "App user object:", appUser);
 
-        // Trigger simulated OTP step ONLY if the user is confirmed as admin
-        // AND hasn't completed the simulated OTP step yet in this session.
-        // IMPORTANT: This is still a simulation. Real MFA is needed. We use adminStatus which
-        // now considers both claims and the hardcoded email as a fallback.
 
-        // Let's simplify: If admin logs in (claim verified or email matches), trigger OTP simulation.
-        // Reset OTP state on user change.
-        setIsVerifyingAdminOtp(adminStatus); // Trigger OTP if admin claim is true or email matches
+        if (adminStatus) {
+          setIsVerifyingAdminOtp(true); 
+          console.log("onAuthStateChanged: Admin identified, OTP verification step initiated.");
+        } else {
+          setIsVerifyingAdminOtp(false);
+        }
 
       } else {
         // User is signed out
+        console.log("onAuthStateChanged: No user detected (signed out).");
         setUser(null);
         setIsAdmin(false);
         setIsVerifyingAdminOtp(false);
@@ -141,20 +148,28 @@ export function useAuth() {
     try {
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
       const firebaseUser = userCredential.user;
+      console.log("loginWithEmail: User signed in:", firebaseUser.email);
 
-      // Check for admin custom claim after login
-       let adminStatus = false;
-       try {
-           const idTokenResult = await firebaseUser.getIdTokenResult(true); // Force refresh
-           adminStatus = !!idTokenResult.claims.admin;
-       } catch (claimError) {
-           console.error("Error fetching claims on login:", claimError);
-           // Fallback check: Check if the email matches the hardcoded admin email
-           if (firebaseUser.email === ADMIN_EMAIL) {
-               console.log("Admin email matched as fallback during login.");
-               adminStatus = true;
-           }
-       }
+      let adminStatus = false;
+      try {
+        const idTokenResult = await firebaseUser.getIdTokenResult(true); // Force refresh
+        if (idTokenResult.claims.admin === true) {
+          adminStatus = true;
+          console.log("loginWithEmail: Admin claim is true.");
+        } else {
+          console.log("loginWithEmail: Admin claim not true or not present. Value:", idTokenResult.claims.admin);
+        }
+      } catch (claimError) {
+        console.error("loginWithEmail: Error fetching claims on login:", claimError);
+      }
+
+      // Fallback if claim didn't confirm admin
+      if (!adminStatus && firebaseUser.email === ADMIN_EMAIL) {
+        console.log("loginWithEmail: Admin email matched as fallback.");
+        adminStatus = true;
+      }
+      console.log("loginWithEmail: Determined adminStatus:", adminStatus);
+
 
       // Check if email is verified (unless it's an admin logging in)
       if (!firebaseUser.emailVerified && !adminStatus) {
@@ -168,32 +183,28 @@ export function useAuth() {
         setIsLoading(false);
         return null;
       }
-
-      // Don't set user state here, onAuthStateChanged handles it
-      setIsAdmin(adminStatus); // Set admin status immediately for conditional logic
-
+      
+      // Do not set user/isAdmin state directly here, onAuthStateChanged is the source of truth.
+      // However, we need to set isVerifyingAdminOtp based on this immediate check.
       if (adminStatus) {
-        // Admin flow: Requires simulated OTP after password login
-        // WARNING: This OTP flow is simulated and NOT secure for production.
-        setIsVerifyingAdminOtp(true); // Trigger simulated OTP step
-        // Redirect handled in LoginPage based on isAdmin and isVerifyingAdminOtp
+        setIsVerifyingAdminOtp(true);
+        console.log("loginWithEmail: Admin identified, OTP step will be required.");
+        // Actual user state (setUser, setIsAdmin) will be handled by onAuthStateChanged
       } else {
-        // Regular user flow
         setIsVerifyingAdminOtp(false);
         toast({ title: "Login Successful", description: "Welcome back!" });
       }
 
       setIsLoading(false);
+      // Return a temporary user object, but rely on onAuthStateChanged for context update
       const appUser: User = {
         id: firebaseUser.uid,
         email: firebaseUser.email,
         name: firebaseUser.displayName,
         avatarUrl: firebaseUser.photoURL,
         emailVerified: firebaseUser.emailVerified,
-        isAdmin: adminStatus,
+        isAdmin: adminStatus, // Use locally determined adminStatus for immediate return
       };
-      // Let onAuthStateChanged handle setting the final user state.
-      // Return user object for immediate use if needed, but rely on context for consistency.
       return appUser;
     } catch (error: any) {
       console.error("Email login error:", error);
@@ -228,7 +239,10 @@ export function useAuth() {
         emailVerified: firebaseUser.emailVerified, // Google accounts are usually verified
         // isAdmin will be set by onAuthStateChanged after checking claims
       };
-      setIsVerifyingAdminOtp(false); // Social logins bypass simulated OTP for now
+      // For social logins, we assume they don't need the simulated OTP step for admin
+      // unless onAuthStateChanged later confirms admin AND isVerifyingAdminOtp is set there.
+      // For simplicity, we set it to false here.
+      setIsVerifyingAdminOtp(false); 
 
       toast({ title: "Login Successful", description: `Welcome, ${appUser.name || 'User'}!` });
       return appUser; // Let onAuthStateChanged handle setting context state
@@ -268,7 +282,7 @@ export function useAuth() {
         emailVerified: true, // Assume verified for simplicity
         // isAdmin will be set by onAuthStateChanged after checking claims
       };
-      setIsVerifyingAdminOtp(false); // Social logins bypass simulated OTP for now
+      setIsVerifyingAdminOtp(false);
 
       toast({ title: "Login Successful", description: `Welcome, ${appUser.name || 'User'}!` });
       return appUser; // Let onAuthStateChanged handle setting context state
@@ -293,34 +307,32 @@ export function useAuth() {
 
   // Simulate OTP verification
   // WARNING: THIS IS A SIMULATION AND NOT SECURE FOR PRODUCTION.
-  // It only proceeds if the user has already been identified as admin via custom claims.
   const verifyAdminOtp = useCallback(async (phoneOtp: string, emailOtp: string): Promise<boolean> => {
-    if (!user || !isAdmin) { // Check claim-based or email-fallback isAdmin status
-      toast({ title: "Error", description: "Admin user not properly logged in.", variant: "destructive" });
+    // This check ensures that we only proceed if onAuthStateChanged has ALREADY confirmed admin status
+    if (!user || !isAdmin) { 
+      toast({ title: "Error", description: "Admin status not confirmed. Cannot verify OTP.", variant: "destructive" });
       return false;
     }
-    setIsLoading(true);
+    setIsLoading(true); // Should be a different loading state, e.g., isSubmittingOtp
     return new Promise((resolve) => {
       setTimeout(() => {
-         // Simulate checking hardcoded OTPs for demonstration ONLY
-         const correctPhoneOtp = "123456"; // Example OTP for phone 9756745653
-         const correctEmailOtp = "654321"; // Example OTP for emails superworth00@gmail.com/rajputkritika87555@gmail.com
+         const correctPhoneOtp = "123456"; 
+         const correctEmailOtp = "654321";
          const success = phoneOtp === correctPhoneOtp && emailOtp === correctEmailOtp;
 
         setIsLoading(false);
         if (success) {
           console.log("Simulated Admin OTP verification successful.");
-          setIsVerifyingAdminOtp(false); // Mark OTP verification as complete for this session
+          setIsVerifyingAdminOtp(false); // Mark OTP verification as complete for this "session"
           toast({ title: "Admin Verification Successful", description: "Welcome, Admin!" });
           resolve(true);
         } else {
           console.log("Simulated Admin OTP verification failed.");
           toast({ title: "OTP Verification Failed", description: "Incorrect OTPs provided. Please try again.", variant: "destructive" });
-          // Don't log out, let them retry OTP on the OTP page.
-          // OTP state remains true.
+          // isVerifyingAdminOtp remains true, so user stays on OTP page
           resolve(false);
         }
-      }, 700); // Simulate validation latency
+      }, 700); 
     });
   }, [user, isAdmin, toast]);
 
@@ -330,13 +342,13 @@ export function useAuth() {
     setIsLoading(true);
     try {
       await signOut(auth);
-      // State updates handled by onAuthStateChanged
+      // State updates handled by onAuthStateChanged, which will set user to null, isAdmin to false, isVerifyingAdminOtp to false.
       toast({ title: "Logged Out", description: "You have been successfully logged out." });
     } catch (error: any) {
       console.error("Logout error:", error);
       toast({ title: "Logout Failed", description: error.message || "Could not log out.", variant: "destructive" });
     } finally {
-      setIsLoading(false); // Ensure loading state is reset
+      setIsLoading(false); 
     }
   };
 
@@ -346,8 +358,16 @@ export function useAuth() {
        try {
            await applyActionCode(auth, actionCode);
            toast({ title: "Email Verified", description: "Your email address has been successfully verified. You can now log in." });
-           // Optionally, force refresh the user state if needed, though onAuthStateChanged might handle it.
-           // await auth.currentUser?.reload();
+           // If a user was signed in (e.g. during a flow where they verify immediately after signup without logout),
+           // their emailVerified status might need a reload.
+           if (auth.currentUser) {
+               await auth.currentUser.reload();
+               // Manually update user state if needed, though onAuthStateChanged should ideally catch this.
+               const refreshedFirebaseUser = auth.currentUser;
+               if (refreshedFirebaseUser) {
+                   setUser(prevUser => prevUser ? {...prevUser, emailVerified: refreshedFirebaseUser.emailVerified} : null);
+               }
+           }
            setIsLoading(false);
            return true;
        } catch (error: any) {
@@ -362,19 +382,13 @@ export function useAuth() {
     user,
     isAdmin,
     isLoading,
-    isVerifyingAdminOtp, // Expose this state for routing logic
+    isVerifyingAdminOtp, 
     signupWithEmail,
     loginWithEmail,
     loginWithGoogle,
     loginWithFacebook,
-    verifyAdminOtp, // Expose the admin OTP function
+    verifyAdminOtp,
     logout,
-    handleVerifyEmail, // Expose email verification handler
+    handleVerifyEmail,
   };
 }
-
-// NOTE: The admin check now relies on Firebase Custom Claims primarily,
-// with a fallback to checking the hardcoded email address.
-// You still need to set the 'admin: true' custom claim on the admin user's account
-// (e.g., using Firebase Functions or the Firebase Admin SDK in a secure environment).
-// The OTP verification remains a simulation and is insecure.
