@@ -385,21 +385,23 @@ const ReadingPage: NextPage<ReadPageProps> = (props) => {
             )}
           </div>
 
-          <Separator className="mt-8" />
-          <div className="flex items-center justify-between pt-4">
-            <Button variant="outline" asChild disabled={!hasPreviousChapter}>
-              <Link href={hasPreviousChapter ? `/read/${slug}/${chapterNumber - 1}` : '#'} className={!hasPreviousChapter ? 'opacity-60 cursor-not-allowed' : ''}>
-                <ChevronLeft className="mr-2 h-4 w-4" /> Previous
-              </Link>
-            </Button>
-            <span className="text-sm text-muted-foreground hidden sm:inline">
-              Chapter {chapterNumber} / {totalChapters}
-            </span>
-            <Button variant="outline" asChild disabled={!hasNextChapter}>
-              <Link href={hasNextChapter ? `/read/${slug}/${chapterNumber + 1}` : '#'} className={!hasNextChapter ? 'opacity-60 cursor-not-allowed' : ''}>
-                Next <ChevronRight className="ml-2 h-4 w-4" />
-              </Link>
-            </Button>
+          <div className="mt-8">
+            <Separator />
+            <div className="flex items-center justify-between pt-4">
+                <Button variant="outline" asChild disabled={!hasPreviousChapter} className="w-1/2">
+                    <Link href={hasPreviousChapter ? `/read/${slug}/${chapterNumber - 1}` : '#'} className="flex items-center justify-center gap-2 w-full">
+                        <ChevronLeft className="mr-2 h-4 w-4" /> Previous
+                    </Link>
+                </Button>
+                <span className="text-sm text-muted-foreground hidden sm:inline">
+                    Chapter {chapterNumber} / {totalChapters}
+                </span>
+                <Button variant="outline" asChild disabled={!hasNextChapter} className="w-1/2">
+                    <Link href={hasNextChapter ? `/read/${slug}/${chapterNumber + 1}` : '#'} className="flex items-center justify-center gap-2 w-full">
+                        Next <ChevronRight className="ml-2 h-4 w-4" />
+                    </Link>
+                </Button>
+            </div>
           </div>
         </div>
       </footer>

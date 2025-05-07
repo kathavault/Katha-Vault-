@@ -35,11 +35,11 @@ interface StoryCommentData {
     timestamp: Date;
 }
 
-interface StoryDetailsResult extends Omit<Story, 'author' | 'chapters' | 'lastUpdated'> {
+interface StoryDetailsResult extends Omit<Story, 'author' | 'chapters' | 'lastUpdated' | 'status'> {
     author: Author; // Use the Author interface
     chaptersData: { id: string; title: string; order: number }[];
     authorFollowers: number; // Example additional data
-    status: 'Ongoing' | 'Completed'; // Use specific status type
+    status: 'Draft' | 'Published' | 'Archived' | 'Ongoing' | 'Completed'; // Use specific status type
     lastUpdated: string; // Keep as string for consistency
     averageRating?: number;
     totalRatings?: number;
@@ -81,6 +81,7 @@ export const fetchStoryDetails = async (slug: string, userId?: string | null): P
         // 2. Fetch chapters ordered by 'order' field
         const chaptersRef = collection(db, "stories", storyId, "chapters");
         const chaptersQuery = query(chaptersRef, orderBy("order", "asc"));
+        const chaptersSnapshot = await getDocs(chaptersQuery); // Added await here
         const chaptersData: { id: string; title: string; order: number }[] = chaptersSnapshot.docs.map(docSnap => ({
             id: docSnap.id,
             title: docSnap.data().title || `Chapter ${docSnap.data().order}`,
@@ -128,6 +129,15 @@ export const fetchStoryDetails = async (slug: string, userId?: string | null): P
               // avatarUrl: fetchedAuthorAvatarUrl // Ideally fetch this
           };
 
+          // Calculate average rating if possible
+           let averageRating: number | undefined = undefined;
+           const totalSum = storyData.totalRatingSum;
+           const count = storyData.ratingCount;
+           if (typeof totalSum === 'number' && typeof count === 'number' && count > 0) {
+               averageRating = totalSum / count;
+           }
+
+
         // 7. Construct the result
         const result: StoryDetailsResult = {
             id: storyId,
@@ -146,8 +156,8 @@ export const fetchStoryDetails = async (slug: string, userId?: string | null): P
             chapters: chaptersData.length, // Store chapter count derived from fetched chapters
             chaptersData: chaptersData, // Include chapter list
             lastUpdated: (storyData.lastUpdated instanceof Timestamp ? storyData.lastUpdated.toDate() : new Date()).toISOString(),
-            averageRating: storyData.averageRating || undefined, // Fetch or calculate
-            totalRatings: storyData.ratingCount || 0, // Fetch or calculate
+            averageRating: averageRating, // Use calculated average
+            totalRatings: count || 0, // Use fetched rating count
             comments: comments,
             userRating: userRating,
             isInLibrary: isInLibrary,
