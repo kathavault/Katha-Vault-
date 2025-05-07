@@ -47,7 +47,7 @@ export default function AdminWritePage() {
   const [storyDescription, setStoryDescription] = React.useState('');
   const [storyGenre, setStoryGenre] = React.useState('');
   const [storyTags, setStoryTags] = React.useState('');
-  const [storyStatus, setStoryStatus] = React.useState<'Draft' | 'Published' | 'Archived'>('Draft');
+  const [storyStatus, setStoryStatus] = React.useState<'Draft' | 'Published' | 'Archived' | 'Ongoing' | 'Completed'>('Draft');
   const [storyCoverImageUrl, setStoryCoverImageUrl] = React.useState<string | undefined>(undefined); // Store cover image URL
   const [chapterTitle, setChapterTitle] = React.useState('');
   const [chapterContent, setChapterContent] = React.useState('');
@@ -192,17 +192,6 @@ export default function AdminWritePage() {
             toast({ title: "Upload Error", description: "No file selected or story not saved yet.", variant: "destructive" });
             return;
         }
-<<<<<<< HEAD
-        console.log('File to be uploaded:', file);
-        console.log('Selected story:', selectedStory);
-        console.log('Is file an image:', file.type.startsWith('image/'));
-        console.log('File size (bytes):', file.size);
-
-        if (!selectedStory?.id) {
-            return;
-        }
-=======
->>>>>>> eeac1358d3ae1f112a5aa4ef27eebeb43ae4c6bf
 
        // Basic file validation (optional: add more checks like size, type)
        if (!file.type.startsWith('image/')) {
@@ -232,7 +221,6 @@ export default function AdminWritePage() {
 
          toast({ title: "Cover Uploaded", description: "New cover image saved successfully." });
        } catch (error) {
-<<<<<<< HEAD
             console.error('Detailed error uploading cover image:', error);
             const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred.';
             toast({
@@ -240,10 +228,6 @@ export default function AdminWritePage() {
                 description: `Could not upload cover image. Error: ${errorMessage}`,
                 variant: 'destructive',
             });
-=======
-         console.error("Error uploading cover image:", error);
-         toast({ title: "Upload Failed", description: "Could not upload cover image.", variant: "destructive" });
->>>>>>> eeac1358d3ae1f112a5aa4ef27eebeb43ae4c6bf
        } finally {
          setIsUploading(false);
        }
@@ -281,7 +265,7 @@ export default function AdminWritePage() {
 
     try {
         // Pass necessary fields explicitly, omit fields managed by Firestore (like reads, potentially chapters depending on structure)
-         const dataToSave: Omit<Story, 'id' | 'chapters' | 'reads' | 'lastUpdated'> & { authorId: string } = {
+         const dataToSave: Omit<Story, 'id' | 'chapters' | 'reads' | 'lastUpdated' | 'chapterCount' | 'averageRating' | 'totalRatingSum' | 'ratingCount' | 'commentCount'> & { authorId: string } = {
             title: storyData.title,
             description: storyData.description,
             genre: storyData.genre,
@@ -290,8 +274,8 @@ export default function AdminWritePage() {
             authorId: storyData.authorId,
             authorName: storyData.authorName,
             coverImageUrl: storyData.coverImageUrl, // Include cover image URL
-             slug: selectedStory?.slug || storyTitle.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, ''), // Generate slug if new
-             // TODO: Ensure slug uniqueness server-side if necessary
+            slug: selectedStory?.slug || storyTitle.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, ''), // Generate slug if new
+            // TODO: Ensure slug uniqueness server-side if necessary
         };
 
         const savedStoryId = await saveStory(selectedStory?.id, dataToSave); // Pass existing ID if editing
@@ -303,7 +287,18 @@ export default function AdminWritePage() {
             chapters: storySnapshot.chapters, // Preserve chapters locally
             reads: storySnapshot.reads, // Preserve reads
             lastUpdated: new Date(), // Update timestamp locally (Firestore handles server time)
+            // Ensure all required fields are present
+            authorAvatarUrl: dataToSave.authorAvatarUrl, // Make sure this is defined or handled if optional
+            chapterCount: storySnapshot.chapters?.length || 0,
+            slug: dataToSave.slug, // Ensure slug is included
+            // Optional fields
+            totalRatingSum: selectedStory?.totalRatingSum,
+            ratingCount: selectedStory?.ratingCount,
+            averageRating: selectedStory?.averageRating,
+            commentCount: selectedStory?.commentCount,
+            dataAiHint: dataToSave.dataAiHint,
         };
+
 
         toast({ title: "Story Saved", description: `Story "${savedOrUpdatedStory.title}" has been saved.` });
 
@@ -460,14 +455,7 @@ export default function AdminWritePage() {
         <Edit3 className="w-8 h-8 text-primary" /> Story Editor
       </h1>
 
-        <Alert variant="warning" className="mb-6">
-             <AlertTriangle className="h-4 w-4" />
-             <AlertTitle>Security Reminder</AlertTitle>
-             <AlertDescription>
-                Ensure your Firestore security rules are correctly configured to restrict write access to administrators only. Client-side checks alone are not sufficient. Ensure Storage rules also restrict uploads to admins.
-             </AlertDescription>
-         </Alert>
-
+        {/* Security Alert Removed */}
 
       <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
         {/* Sidebar - Story & Chapter List */}
@@ -604,6 +592,8 @@ export default function AdminWritePage() {
                                 <SelectItem value="Draft">Draft</SelectItem>
                                 <SelectItem value="Published">Published</SelectItem>
                                 <SelectItem value="Archived">Archived</SelectItem>
+                                <SelectItem value="Ongoing">Ongoing</SelectItem>
+                                <SelectItem value="Completed">Completed</SelectItem>
                             </SelectContent>
                         </Select>
                     </div>

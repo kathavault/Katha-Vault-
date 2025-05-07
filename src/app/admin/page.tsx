@@ -28,7 +28,7 @@ export default function AdminDashboardPage() {
 
   if (isLoading || !user) {
     return (
-      
+
       <div className="flex min-h-[calc(100vh-10rem)] items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
@@ -55,18 +55,7 @@ export default function AdminDashboardPage() {
         Welcome, Admin ({user.email}). Manage Katha Vault content and settings here.
       </p>
 
-       {/* Important Security Note */}
-       <Card className="mt-8 border-destructive bg-destructive/10">
-           <CardHeader>
-               <CardTitle className="text-destructive">Security Notice</CardTitle>
-           </CardHeader>
-           <CardContent className="text-destructive/90 space-y-2">
-               <p>This is a **simulated** admin panel with basic functionality.</p>
-               <p>While login and OTP are simulated, the story editor now interacts with **live Firestore data**.</p>
-               <p>Ensure your **Firestore Security Rules** are correctly configured to only allow administrators to write/delete data in the relevant collections (`stories`, `chapters`, `users`, `siteSettings`).</p>
-                <p><strong>Do not rely solely on client-side checks. Secure all data modification actions with robust backend validation and authorization (e.g., Firebase Security Rules, Firebase Functions with role checks).</strong></p>
-           </CardContent>
-       </Card>
+       {/* Security Notice Card Removed */}
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {/* Link to Story Editor */}
