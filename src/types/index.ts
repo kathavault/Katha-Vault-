@@ -57,7 +57,7 @@ export interface Story {
                            // Often fetched paginated or limited set
 }
 
-// Represents basic user profile information
+// Represents basic user profile information stored in Firestore
 export interface UserProfile {
     id: string; // Same as Firebase Auth UID
     name?: string | null;
@@ -71,10 +71,22 @@ export interface UserProfile {
     storiesPublishedCount?: number;
 }
 
-// Represents site-wide settings (example)
+// Represents user-specific settings stored in Firestore (e.g., under /users/{userId}/preferences/settings)
+export interface UserSettings {
+    emailNotifications?: boolean; // e.g., new chapter alerts, comments
+    pushNotifications?: boolean; // For future mobile app integration
+    readingTheme?: 'light' | 'dark' | 'sepia' | 'system'; // Reading view theme
+    fontSize?: 'small' | 'medium' | 'large' | 'xlarge'; // Reading view font size
+    language?: string; // Preferred interface language (e.g., 'en', 'hi')
+    // Add other preferences as needed
+}
+
+
+// Represents site-wide settings (example) stored in Firestore (e.g., under /siteSettings/config)
 export interface SiteSettings {
     siteTitle: string;
     siteDescription: string;
     allowUserRegistration: boolean;
-    // Add other settings
+    // Add other global settings
 }
+
