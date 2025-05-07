@@ -2,7 +2,7 @@
 import type { NextPage } from 'next';
 import StoryCard, { type Story } from '@/components/story/story-card';
 import { Button } from '@/components/ui/button';
-import { ArrowRight, Zap, TrendingUp, Feather } from 'lucide-react'; // Added icons
+import { ArrowRight, Zap, TrendingUp, Feather, Sparkles } from 'lucide-react'; // Added Sparkles icon
 import Link from 'next/link';
 
 // Expanded and diversified mock data
@@ -12,7 +12,7 @@ const mockStories: Story[] = [
     title: 'The Crimson Cipher',
     author: 'Alex Quill',
     description: 'A thrilling adventure into the unknown depths of ancient ruins, where secrets lie buried.',
-    coverImageUrl: 'https://picsum.photos/seed/crimson-cipher/400/600', // Updated placeholder URL
+    coverImageUrl: 'https://picsum.photos/seed/crimson-cipher/400/600',
     genre: 'Adventure',
     reads: 12567,
     chapters: 25,
@@ -148,7 +148,7 @@ const mockStories: Story[] = [
     chapters: 50, // Representing 50 poems
     tags: ['Emotional', 'Reflective', 'Verse'],
     slug: 'poetry-for-the-soul',
-    priority: true, // Explicitly setting priority for this story
+    priority: true, 
      dataAiHint: 'poetry collection book cover',
   },
     {
@@ -166,13 +166,56 @@ const mockStories: Story[] = [
   },
 ];
 
+const shortStories: Story[] = [
+  {
+    id: 'short-story-1',
+    title: 'Dil Ke Raaste',
+    author: 'Katha Vault',
+    description: 'Ek anokhi prem kahani jo dil ke raaston se hokar guzarti hai, jahan har mod par ek nayi ummeed hai.',
+    coverImageUrl: 'https://picsum.photos/seed/dil-ke-raaste-love/400/600', // Placeholder image
+    genre: 'Romance',
+    reads: 15250,
+    chapters: 10, // Short stories have fewer chapters
+    tags: ['Short Story', 'Love', 'Romance', 'Hindi'],
+    slug: 'dil-ke-raaste',
+    dataAiHint: 'romance couple love story', // Hint for the provided image
+    priority: true, // Make it priority if it's likely to be above the fold
+  },
+  // Add more short stories here, up to 6 for the section
+  {
+    id: 'short-story-2',
+    title: 'Chandni Raat Ka Safar',
+    author: 'Ravi Kumar',
+    description: 'Ek raat ka safar jo do ajnabi dilon ko kareeb le aata hai, chandni ki roshni mein.',
+    coverImageUrl: 'https://picsum.photos/seed/chandni-raat/400/600',
+    genre: 'Romance',
+    reads: 9800,
+    chapters: 5,
+    tags: ['Short Story', 'Night', 'Journey'],
+    slug: 'chandni-raat-ka-safar',
+    dataAiHint: 'night journey romance book cover',
+  },
+  {
+    id: 'short-story-3',
+    title: 'Anjaan Rishta',
+    author: 'Priya Sharma',
+    description: 'Ek anjaan rishte ki kahani, jo waqt ke sath gehra hota jaata hai.',
+    coverImageUrl: 'https://picsum.photos/seed/anjaan-rishta/400/600',
+    genre: 'Drama',
+    reads: 12300,
+    chapters: 8,
+    tags: ['Short Story', 'Relationship', 'Emotions'],
+    slug: 'anjaan-rishta',
+    dataAiHint: 'drama relationship book cover',
+  },
+];
+
 
 const Home: NextPage = () => {
-  // In a real app, fetch data here
-  // More realistic slicing for sections
   const trendingStories = mockStories.sort((a, b) => b.reads - a.reads).slice(0, 6);
-  const newStories = mockStories.slice().reverse().slice(0, 6); // Get the latest added
-  const featuredStories = mockStories.filter(s => ['Fantasy', 'Sci-Fi', 'Romance'].includes(s.genre)).slice(0, 6); // Example: feature specific genres
+  const newStories = mockStories.slice().reverse().slice(0, 6); 
+  const featuredStories = mockStories.filter(s => ['Fantasy', 'Sci-Fi', 'Romance'].includes(s.genre)).slice(0, 6); 
+  const displayedShortStories = shortStories.slice(0, 6); // Show up to 6 short stories
 
   return (
     <div className="space-y-12 md:space-y-16">
@@ -186,7 +229,6 @@ const Home: NextPage = () => {
           <Button size="lg" asChild className="bg-primary text-primary-foreground hover:bg-primary/90 shadow-md hover:shadow-lg transition-shadow">
             <Link href="/browse">Start Reading</Link>
           </Button>
-           {/* Start Writing button is removed from here and will be shown conditionally in the header for admins */}
          </div>
       </section>
 
@@ -207,7 +249,7 @@ const Home: NextPage = () => {
             <StoryCard
               key={story.id}
               story={story}
-              priority={index < 6} // Set priority true for the first few (e.g., 6) cards in this visible section
+              priority={index < 6} 
             />
           ))}
         </div>
@@ -227,9 +269,28 @@ const Home: NextPage = () => {
         </div>
          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4 md:gap-6">
            {newStories.map((story) => (
-             <StoryCard key={story.id} story={story} /> // Priority might not be needed here if below the fold
+             <StoryCard key={story.id} story={story} />
            ))}
          </div>
+      </section>
+
+      {/* Short Stories Section */}
+      <section>
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-2xl font-semibold flex items-center gap-2">
+            <Sparkles className="w-6 h-6 text-yellow-500" /> Short Stories
+          </h2>
+          <Button variant="link" asChild className="text-primary hover:text-primary/80">
+            <Link href="/browse?category=short-stories"> 
+              See All <ArrowRight className="ml-1 h-4 w-4" />
+            </Link>
+          </Button>
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4 md:gap-6">
+          {displayedShortStories.map((story) => (
+            <StoryCard key={story.id} story={story} />
+          ))}
+        </div>
       </section>
 
        {/* Featured Section Example */}
@@ -239,22 +300,19 @@ const Home: NextPage = () => {
              <Feather className="w-6 h-6 text-secondary-foreground" /> Featured Fantasy & Sci-Fi
            </h2>
            <Button variant="link" asChild className="text-primary hover:text-primary/80">
-             <Link href="/browse?genre=Fantasy&genre=Sci-Fi"> {/* Example multi-filter */}
+             <Link href="/browse?genre=Fantasy&genre=Sci-Fi"> 
                See All <ArrowRight className="ml-1 h-4 w-4" />
              </Link>
            </Button>
          </div>
          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4 md:gap-6">
            {featuredStories.map((story) => (
-             <StoryCard key={story.id} story={story} /> // Priority might not be needed here if below the fold
+             <StoryCard key={story.id} story={story} />
            ))}
          </div>
        </section>
-
-
     </div>
   );
 };
 
 export default Home;
-
