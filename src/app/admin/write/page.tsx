@@ -192,6 +192,14 @@ export default function AdminWritePage() {
             toast({ title: "Upload Error", description: "No file selected or story not saved yet.", variant: "destructive" });
             return;
         }
+        console.log('File to be uploaded:', file);
+        console.log('Selected story:', selectedStory);
+        console.log('Is file an image:', file.type.startsWith('image/'));
+        console.log('File size (bytes):', file.size);
+
+        if (!selectedStory?.id) {
+            return;
+        }
 
        // Basic file validation (optional: add more checks like size, type)
        if (!file.type.startsWith('image/')) {
@@ -221,8 +229,13 @@ export default function AdminWritePage() {
 
          toast({ title: "Cover Uploaded", description: "New cover image saved successfully." });
        } catch (error) {
-         console.error("Error uploading cover image:", error);
-         toast({ title: "Upload Failed", description: "Could not upload cover image.", variant: "destructive" });
+            console.error('Detailed error uploading cover image:', error);
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred.';
+            toast({
+                title: 'Upload Failed',
+                description: `Could not upload cover image. Error: ${errorMessage}`,
+                variant: 'destructive',
+            });
        } finally {
          setIsUploading(false);
        }
