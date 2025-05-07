@@ -4,22 +4,11 @@
 
 const admin = require("firebase-admin");
 
-// **Important:** Replace this path with the actual path to your downloaded service account key file.
-// Download your service account key from Firebase Project Settings -> Service accounts -> Generate new private key
-const serviceAccount = require("./serviceAccountKey.json"); // Ensure this path is correct
-
-admin.initializeApp({
-  credential: admin.credential.cert(serviceAccount)
-});
-
 // **Important:** Replace this placeholder with the actual Firebase UID of the user you want to make an admin.
 // You can find the UID in the Firebase Authentication console.
-const uid = "SpiTC3hGgZfXTHMOiIHdf59Dngg2"; // User provided UID
+const uid = "SpiTC3hGgZfXTHMOiIHdf59Dngg2";
 
-if (uid === "YAHAN_APNA_UID_DALO") {
-    console.error("Error: Please replace 'YAHAN_APNA_UID_DALO' with the actual Firebase User ID.");
-    process.exit(1); // Exit the script if the placeholder UID is still present
-}
+admin.initializeApp();
 
 
 // Set the custom claim { admin: true } for the specified user
