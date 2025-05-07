@@ -63,11 +63,7 @@ interface ChapterDetailsResult {
 /**
  * Fetches detailed information for a specific chapter, including comments.
  */
-<<<<<<< HEAD
 export const fetchChapterDetails = async (slug: string, chapterNumber: number, userId?: string | null): Promise<ChapterDetailsResult | null> => {
-=======
-export const fetchChapterDetails = async (slug: string, chapterNumber: number, userId?: string | null): Promise&lt;ChapterDetailsResult | null&gt; => {
->>>>>>> eeac1358d3ae1f112a5aa4ef27eebeb43ae4c6bf
     try {
         // 1. Find the story by slug
         const storiesRef = collection(db, "stories");
@@ -92,11 +88,7 @@ export const fetchChapterDetails = async (slug: string, chapterNumber: number, u
             return null;
         }
         const chapterDoc = chapterSnapshot.docs[0];
-<<<<<<< HEAD
         const chapterData = chapterDoc.data() as Omit<Chapter, 'id'>; // Fixed Omit syntax
-=======
-        const chapterData = chapterDoc.data() as Omit&lt;Chapter, 'id'&gt;;
->>>>>>> eeac1358d3ae1f112a5aa4ef27eebeb43ae4c6bf
         const chapterId = chapterDoc.id;
 
         // 3. Fetch comments for this chapter (e.g., last 20)
@@ -150,11 +142,7 @@ export const fetchChapterDetails = async (slug: string, chapterNumber: number, u
 /**
  * Submits a comment for a specific chapter.
  */
-<<<<<<< HEAD
 export const submitComment = async (params: SubmitCommentParams): Promise<{ id: string }> => {
-=======
-export const submitComment = async (params: SubmitCommentParams): Promise&lt;{ id: string }&gt; => {
->>>>>>> eeac1358d3ae1f112a5aa4ef27eebeb43ae4c6bf
     const { storyId, chapterId, userId, text } = params;
 
     if (!auth.currentUser || auth.currentUser.uid !== userId) {
@@ -183,21 +171,13 @@ export const submitComment = async (params: SubmitCommentParams): Promise&lt;{ i
 /**
  * Submits or updates a rating for a specific chapter.
  */
-<<<<<<< HEAD
 export const submitRating = async (params: SubmitRatingParams): Promise<void> => {
-=======
-export const submitRating = async (params: SubmitRatingParams): Promise&lt;void&gt; => {
->>>>>>> eeac1358d3ae1f112a5aa4ef27eebeb43ae4c6bf
     const { storyId, chapterId, userId, rating } = params;
 
      if (!auth.currentUser || auth.currentUser.uid !== userId) {
         throw new Error("User is not authenticated or UID mismatch.");
      }
-<<<<<<< HEAD
      if (rating < 1 || rating > 5) {
-=======
-     if (rating &lt; 1 || rating &gt; 5) {
->>>>>>> eeac1358d3ae1f112a5aa4ef27eebeb43ae4c6bf
          throw new Error("Rating must be between 1 and 5.");
      }
 
@@ -232,7 +212,3 @@ export const submitRating = async (params: SubmitRatingParams): Promise&lt;void&
         throw new Error("Failed to submit rating.");
     }
 };
-<<<<<<< HEAD
-
-=======
->>>>>>> eeac1358d3ae1f112a5aa4ef27eebeb43ae4c6bf
