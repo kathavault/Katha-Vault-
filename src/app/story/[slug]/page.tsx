@@ -1,43 +1,10 @@
 // src/app/story/[slug]/page.tsx
-'use client';
 
+// --- Type Definitions ---
 import type { NextPage } from 'next';
-import Image from 'next/image';
-import Link from 'next/link';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import {
-    BookOpen,
-    Eye,
-    List,
-    PlusCircle,
-    CheckCircle,
-    Star,
-    Share2,
-    Send,
-    Loader2,
-    Twitter,
-    Facebook,
-    Copy,
-    MessageSquare,
-    Bookmark,
-    Heart,
-} from 'lucide-react';
 import type { Story as BaseStory } from '@/components/story/story-card';
-import React, { useEffect, useState, Suspense, use } from 'react';
-import { useAuth } from '@/hooks/use-auth';
-import { Textarea } from '@/components/ui/textarea';
-import { useToast } from '@/hooks/use-toast';
-import { validateCommentData, validateRatingData } from '@/services/validationService';
-import { fetchStoryDetails, submitStoryComment, submitStoryRating, toggleLibraryStatus } from '@/lib/storyService';
 import type { Timestamp } from 'firebase/firestore';
-import { Skeleton } from '@/components/ui/skeleton'; // Import Skeleton
 
-// Define the Story type again for clarity, aligning with `storyService` expectations
-// Ensure this aligns with the structure returned by fetchStoryDetails
 interface Author {
     name: string;
     id: string;
@@ -95,6 +62,42 @@ interface StoryPageResolvedParams {
 interface StoryPageProps {
     params: Promise<StoryPageResolvedParams>;
 }
+
+// --- Client Component ---
+'use client';
+
+import Image from 'next/image';
+import Link from 'next/link';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import {
+    BookOpen,
+    Eye,
+    List,
+    PlusCircle,
+    CheckCircle,
+    Star,
+    Share2,
+    Send,
+    Loader2,
+    Twitter,
+    Facebook,
+    Copy,
+    MessageSquare,
+    Bookmark,
+    Heart,
+} from 'lucide-react';
+import React, { useEffect, useState, Suspense, use } from 'react';
+import { useAuth } from '@/hooks/use-auth';
+import { Textarea } from '@/components/ui/textarea';
+import { useToast } from '@/hooks/use-toast';
+import { validateCommentData, validateRatingData } from '@/services/validationService';
+import { fetchStoryDetails, submitStoryComment, submitStoryRating, toggleLibraryStatus } from '@/lib/storyService';
+import { Skeleton } from '@/components/ui/skeleton'; // Import Skeleton
+
 
 const StoryDetailPage: NextPage<StoryPageProps> = (props) => {
     // --- Hooks and State ---

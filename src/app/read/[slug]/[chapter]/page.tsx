@@ -55,31 +55,58 @@ interface ReadPageProps {
   params: Promise<ReadPageResolvedParams>;
 }
 
-const formatContent = (text: string): React.ReactNode => {
+const formatContent = (text: string): React.ReactNode[] => {
   const paragraphs = text.trim().split(/\n\s*\n/);
   return paragraphs.map((p, i) => {
-    let content: string = p;
-    content = p.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-    content = content.replace(/\*(.*?)\*/g, '<em>$1</em>');
-    if (p.startsWith('&gt; ')) return <blockquote key={i} className="pl-4 italic border-l-4 my-4">{p.substring(2)}</blockquote>;
-    if (p === '---') return <hr key={i} className="my-6" />;
+    if (p.startsWith('&gt; ')) {
+        return <blockquote key={i} className="pl-4 italic border-l-4 my-4">{p.substring(4)}</blockquote>; // Changed from 2 to 4 for '&gt; '
+    }
+    if (p === '---') {
+        return <hr key={i} className="my-6" />;
+    }
 
-      const lines = p.split('\n').map((line, lineIndex) => (
-      <React.Fragment key={lineIndex}>
-        {line.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/\*(.*?)\*/g, '<em>$1</em>')}
-        {lineIndex < p.split('\n').length - 1 && <br />}
+    // Handle bold and italics within paragraphs using simple string splitting and element creation
+    const nodes: React.ReactNode[] = [];
+    let remainingText = p;
+    let keyCounter = 0;
 
-      </React.Fragment>
-    ));
-    const htmlContent = lines.map(lineElement => {
-        if (React.isValidElement(lineElement) && lineElement.props.children) {
-            return React.Children.toArray(lineElement.props.children).join('');
+    while (remainingText.length > 0) {
+        const boldMatch = remainingText.match(/\*\*(.*?)\*\*/);
+        const italicMatch = remainingText.match(/\*(.*?)\*/);
+
+        let match = null;
+        let isBold = false;
+
+        // Find the earliest match
+        if (boldMatch && (!italicMatch || boldMatch.index! < italicMatch.index!)) {
+            match = boldMatch;
+            isBold = true;
+        } else if (italicMatch) {
+            match = italicMatch;
+            isBold = false;
         }
-        return '';
-    }).join('');
-    return <p key={i} dangerouslySetInnerHTML={{ __html: htmlContent }}></p>;
+
+        if (match) {
+            const textBefore = remainingText.substring(0, match.index!);
+            if (textBefore) {
+                nodes.push(<React.Fragment key={`text-${i}-${keyCounter++}`}>{textBefore.split('\n').map((line, idx) => <React.Fragment key={idx}>{line}{idx < textBefore.split('\n').length - 1 && <br />}</React.Fragment>)}</React.Fragment>);
+            }
+            const content = match[1];
+            nodes.push(isBold
+                ? <strong key={`bold-${i}-${keyCounter++}`}>{content}</strong>
+                : <em key={`italic-${i}-${keyCounter++}`}>{content}</em>
+            );
+            remainingText = remainingText.substring(match.index! + match[0].length);
+        } else {
+             nodes.push(<React.Fragment key={`text-${i}-${keyCounter++}`}>{remainingText.split('\n').map((line, idx) => <React.Fragment key={idx}>{line}{idx < remainingText.split('\n').length - 1 && <br />}</React.Fragment>)}</React.Fragment>);
+             remainingText = '';
+        }
+    }
+
+     return <p key={i}>{nodes}</p>;
   });
 };
+
 
 const ReadingPage: NextPage<ReadPageProps> = (props) => {
   const resolvedParams = use(props.params); // Unwrap the promise
@@ -88,7 +115,7 @@ const ReadingPage: NextPage<ReadPageProps> = (props) => {
 
   const { user, isLoading: authLoading } = useAuth();
   const { toast } = useToast();
-  const [chapterData, setChapterData] = useState<ChapterDetails | null>(null);
+  const [chapterData, setChapterData] = useState<ChapterDetailsResult | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [commentText, setCommentText] = useState('');
   const [rating, setRating] = useState(0);
@@ -299,7 +326,7 @@ const ReadingPage: NextPage<ReadPageProps> = (props) => {
       </header>
 
       <main className="flex-grow container max-w-3xl mx-auto px-4 py-8 md:py-12">
-        <article className="prose prose-lg dark:prose-invert max-w-none prose-p:text-foreground/90 prose-strong:text-foreground" style={{ fontFamily: "'Georgia', 'Times New Roman', Times, serif", lineHeight: '1.8' }}>
+        <article className="prose prose-lg dark:prose-invert max-w-none prose-p:text-foreground/90 prose-strong:text-foreground prose-em:text-foreground/80" style={{ fontFamily: "'Georgia', 'Times New Roman', Times, serif", lineHeight: '1.8' }}>
           {formatContent(content)}
         </article>
       </main>
