@@ -7,17 +7,13 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import {
     BookOpen,
     Eye,
-    Users,
-    MessageSquare,
-    ThumbsUp,
     List,
     PlusCircle,
-    Library,
     CheckCircle,
     Star,
     Share2,
@@ -26,13 +22,15 @@ import {
     Twitter,
     Facebook,
     Copy,
-} from 'lucide-react'; // Added social icons & Copy
+    MessageSquare,
+    Bookmark, // New icon for library
+    Heart, // Placeholder for follow author
+} from 'lucide-react';
 import type { Story as BaseStory } from '@/components/story/story-card';
-import React, { useEffect, useState, Suspense, use } from 'react'; // Import use
+import React, { useEffect, useState, Suspense, use } from 'react';
 import { useAuth } from '@/hooks/use-auth';
-import { Textarea } from '@/components/ui/textarea'; // Import use
+import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
-// Removed imports for StoryDetail and ChapterTable as logic is integrated
 import { validateCommentData, validateRatingData } from '@/services/validationService';
 import { fetchStoryDetails, submitStoryComment, submitStoryRating, toggleLibraryStatus } from '@/lib/storyService';
 import type { Timestamp } from 'firebase/firestore';
@@ -41,6 +39,8 @@ interface Author {
     name: string;
     id: string;
     avatarUrl?: string;
+    // bio?: string; // Optional: if fetched
+    // followers?: number; // Optional: if fetched
 }
 
 interface StoryCommentData {
@@ -52,35 +52,34 @@ interface StoryCommentData {
     timestamp: Date;
 }
 
-// Define extended Story type for this page, including all fields from BaseStory
-interface StoryDetails extends Omit<BaseStory, 'author' | 'chapters' | 'lastUpdated'> {
+interface StoryDetails extends Omit<BaseStory, 'author' | 'chapters' | 'lastUpdated' | 'status'> {
     id: string;
     author: Author;
-    chaptersData: { id: string; title: string; order: number }[];
-    authorFollowers: number; // Example additional data
-    status: 'Draft' | 'Published' | 'Archived' | 'Ongoing' | 'Completed'; // Use specific status type
-    lastUpdated: string; // Keep as string for consistency
+    chaptersData: { id: string; title: string; order: number; wordCount?: number; lastUpdated?: string }[]; // Added more chapter details
+    authorFollowers: number;
+    status: 'Draft' | 'Published' | 'Archived' | 'Ongoing' | 'Completed';
+    lastUpdated: string;
     averageRating?: number;
     totalRatings?: number;
     chapters: number; // Explicit chapters count
     comments?: StoryCommentData[];
-    userRating?: number; // User's overall rating for this story
+    userRating?: number;
     isInLibrary?: boolean;
+    // Add any other fields fetched by storyService
+    // Example: totalVotes if different from totalRatings
 }
 
-// Define the shape of the resolved params
 interface StoryPageResolvedParams {
     slug: string;
 }
 
-// params prop is now a Promise
 interface StoryPageProps {
     params: Promise<StoryPageResolvedParams>;
 }
 
 const StoryDetailPage: NextPage<StoryPageProps> = (props) => {
-    const resolvedParams = use(props.params); // Unwrap the promise
-    const { slug } = resolvedParams; // Get slug from the resolved object
+    const resolvedParams = use(props.params);
+    const { slug } = resolvedParams;
 
     const { user, isLoading: authLoading } = useAuth();
     const { toast } = useToast();
@@ -96,10 +95,9 @@ const StoryDetailPage: NextPage<StoryPageProps> = (props) => {
 
     useEffect(() => {
         const fetchStory = async () => {
-            if (!slug) return; // Don't fetch if slug isn't resolved yet
+            if (!slug) return;
             setIsLoading(true);
             try {
-                // Pass userId if available to check library status and user rating
                 const data = await fetchStoryDetails(slug, user?.id);
                 setStory(data);
                 setRating(data?.userRating || 0);
@@ -117,11 +115,10 @@ const StoryDetailPage: NextPage<StoryPageProps> = (props) => {
                 setIsLoading(false);
             }
         };
-        // Fetch only when auth state is resolved AND slug is available
         if (!authLoading && slug) {
             fetchStory();
         }
-    }, [slug, user?.id, authLoading, toast]); // Add user?.id as dependency
+    }, [slug, user?.id, authLoading, toast]);
 
     const handleCommentSubmit = async () => {
         if (!user || !story) {
@@ -133,7 +130,6 @@ const StoryDetailPage: NextPage<StoryPageProps> = (props) => {
             toast({ title: "Validation Error", description: validationError, variant: "destructive" });
             return;
         }
-
         setIsSubmittingComment(true);
         try {
             const newComment = await submitStoryComment({
@@ -169,11 +165,9 @@ const StoryDetailPage: NextPage<StoryPageProps> = (props) => {
             toast({ title: "Validation Error", description: validationError, variant: "destructive" });
             return;
         }
-
         setIsSubmittingRating(true);
         const previousRating = rating;
         setRating(newRating);
-
         try {
             await submitStoryRating({
                 storyId: story.id,
@@ -181,10 +175,10 @@ const StoryDetailPage: NextPage<StoryPageProps> = (props) => {
                 rating: newRating,
             });
             toast({ title: "Rating Submitted", description: `You rated this story ${newRating} stars.` });
-             // Re-fetch story details to update average rating display
-             fetchStoryDetails(slug, user?.id).then(data => {
-                 if (data) setStory(data);
-             });
+            // Re-fetch story details to update average rating display
+            fetchStoryDetails(slug, user?.id).then(data => {
+                if (data) setStory(data);
+            });
         } catch (error) {
             console.error("Error submitting story rating:", error);
             toast({ title: "Error Submitting Rating", description: "Could not save your rating. Please try again.", variant: "destructive" });
@@ -194,7 +188,7 @@ const StoryDetailPage: NextPage<StoryPageProps> = (props) => {
         }
     };
 
-    const handleShareStory = async (platform: 'web' | 'facebook' | 'twitter') => {
+    const handleShareStory = async (platform: 'web' | 'facebook' | 'twitter' | 'copy') => {
         if (!story) {
             toast({ title: "Error", description: "Story not available.", variant: "destructive" });
             return;
@@ -202,16 +196,17 @@ const StoryDetailPage: NextPage<StoryPageProps> = (props) => {
         const url = window.location.href;
         const text = `Check out "${story.title}" by ${story.author.name} on Katha Vault!`;
 
+        if (platform === 'copy') {
+             handleCopyUrl();
+             return;
+        }
+
         if (platform === 'web' && navigator.share) {
             try {
-                await navigator.share({
-                    title: story.title,
-                    text: text,
-                    url: url,
-                });
+                await navigator.share({ title: story.title, text: text, url: url });
             } catch (error) {
                 console.error("Web Share API error:", error);
-                 handleCopyUrl(); // Fallback to copy link
+                handleCopyUrl(); // Fallback to copy link
             }
         } else {
             let shareUrl = '';
@@ -219,27 +214,23 @@ const StoryDetailPage: NextPage<StoryPageProps> = (props) => {
                 shareUrl = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`;
             } else if (platform === 'twitter') {
                 shareUrl = `https://twitter.com/intent/tweet?url=${encodeURIComponent(url)}&text=${encodeURIComponent(text)}`;
-            } else {
-                 handleCopyUrl(); // Default to copy link
-                 return;
             }
-             window.open(shareUrl, '_blank', 'noopener,noreferrer');
+            if (shareUrl) {
+                window.open(shareUrl, '_blank', 'noopener,noreferrer');
+            } else {
+                handleCopyUrl(); // Default to copy link if platform not matched
+            }
         }
     };
 
     const handleCopyUrl = () => {
-        if (!story) {
-            toast({ title: "Error", description: "Story not available.", variant: "destructive" });
-            return;
-        }
+        if (!story) return;
         const storyUrl = window.location.href;
         navigator.clipboard.writeText(storyUrl)
-            .then(() => {
-                toast({ title: "Copied!", description: "Story URL copied to clipboard." });
-            })
+            .then(() => toast({ title: "Copied!", description: "Story URL copied to clipboard." }))
             .catch(error => {
                 console.error("Failed to copy story URL:", error);
-                toast({ title: "Error", description: "Failed to copy URL. Please try again.", variant: "destructive" });
+                toast({ title: "Error", description: "Failed to copy URL.", variant: "destructive" });
             });
     };
 
@@ -251,7 +242,6 @@ const StoryDetailPage: NextPage<StoryPageProps> = (props) => {
         setIsTogglingLibrary(true);
         const previousLibraryStatus = isInLibrary;
         setIsInLibrary(!isInLibrary);
-
         try {
             await toggleLibraryStatus(user.id, story.id, !previousLibraryStatus);
             toast({ title: `Story ${!previousLibraryStatus ? 'Added To' : 'Removed From'} Library` });
@@ -265,7 +255,7 @@ const StoryDetailPage: NextPage<StoryPageProps> = (props) => {
     };
 
     if (isLoading || authLoading) {
-        return <div className="flex items-center justify-center min-h-screen"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
+        return <div className="flex items-center justify-center min-h-[calc(100vh-10rem)]"><Loader2 className="h-12 w-12 animate-spin text-primary" /></div>;
     }
 
     if (!story) {
@@ -273,277 +263,267 @@ const StoryDetailPage: NextPage<StoryPageProps> = (props) => {
     }
 
     const displayRating = story.averageRating ? story.averageRating.toFixed(1) : 'N/A';
-    const fullStars = Math.floor(story.averageRating || 0);
-    const hasHalfStar = (story.averageRating || 0) % 1 >= 0.5;
 
     return (
-        <div className="container mx-auto py-8 md:py-12 space-y-8 lg:space-y-12">
-            {/* Top Section: Title, Author, Basic Actions */}
-            <section className="space-y-4">
-                <h1 className="text-3xl md:text-5xl font-bold leading-tight text-foreground">{story.title}</h1>
-                <div className="flex flex-wrap items-center gap-x-6 gap-y-3 text-muted-foreground">
-                    {/* Author */}
-                    <Link href={`/user/${story.author.id}`} className="flex items-center gap-2 group hover:text-primary transition-colors">
-                        <Avatar className="h-9 w-9 border border-border">
-                            <AvatarImage src={story.author.avatarUrl || undefined} alt={story.author.name} data-ai-hint="author avatar small"/>
-                            <AvatarFallback>{story.author.name.substring(0, 1).toUpperCase()}</AvatarFallback>
-                        </Avatar>
-                        <span className="font-medium text-base text-foreground group-hover:text-primary">{story.author.name}</span>
-                    </Link>
-                    <Separator orientation="vertical" className="h-5 hidden sm:block" />
-                    {/* Rating Display */}
-                     <div className="flex items-center gap-1.5" title={`Average Rating: ${displayRating}`}>
-                        <Star className={`h-5 w-5 ${story.averageRating ? 'text-primary fill-primary' : 'text-muted-foreground/50'}`} />
-                        <span className="font-semibold text-foreground">{displayRating}</span>
-                         <span className="text-sm">({story.totalRatings || 0} ratings)</span>
-                     </div>
-                     <Separator orientation="vertical" className="h-5 hidden sm:block" />
-                     {/* Status Badge */}
-                     <Badge variant={story.status === 'Completed' ? "secondary" : "outline"} className={`capitalize ${story.status === 'Completed' ? "text-green-700 border-green-300 bg-green-50" : (story.status === 'Ongoing' ? "text-blue-700 border-blue-300 bg-blue-50" : "")}`}>
-                       {story.status}
-                     </Badge>
-                 </div>
+        <div className="container mx-auto py-6 md:py-10">
+            {/* Header Section - Simplified */}
+            <section className="relative mb-8 md:mb-12 text-center">
+                {/* Optional: Background image or color block */}
+                <div className="absolute inset-0 opacity-10 bg-gradient-to-b from-primary/20 to_transparent -z-10"></div>
+                <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold leading-tight text-foreground mb-2">{story.title}</h1>
+                <div className="text-lg text-muted-foreground">
+                    by <Link href={`/profile/${story.author.id}`} className="text-primary hover:underline font-medium">{story.author.name}</Link>
+                </div>
             </section>
 
-            {/* Main Content: Cover, Summary, Actions, Chapters */}
-            <section className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12">
-                {/* Left Column: Cover & Meta */}
-                <div className="lg:col-span-4 xl:col-span-3 space-y-6">
-                     <Card className="overflow-hidden shadow-lg border border-border/80">
-                         <div className="relative aspect-[2/3] w-full">
-                             <Image
+            {/* Main Layout Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-12 gap-6 md:gap-8">
+                {/* Left Column: Cover, Actions, Meta */}
+                <aside className="md:col-span-4 lg:col-span-3 space-y-6">
+                    <Card className="overflow-hidden shadow-lg border border-border/80 sticky top-20">
+                        <div className="relative aspect-[2/3] w-full">
+                            <Image
                                 src={story.coverImageUrl || `https://picsum.photos/seed/${slug}/400/600`}
                                 alt={`Cover for ${story.title}`}
                                 fill
-                                sizes="(max-width: 1024px) 100vw, 33vw"
+                                sizes="(max-width: 768px) 100vw, (max-width: 1024px) 33vw, 25vw"
                                 className="object-cover"
                                 priority // LCP candidate
                                 data-ai-hint={story.dataAiHint || "book cover story detail large"}
-                              />
-                         </div>
-                     </Card>
-
-                     {/* Action Buttons */}
-                     <div className="flex flex-col gap-3">
-                         <Button size="lg" asChild className="w-full bg-primary text-primary-foreground hover:bg-primary/90 text-base font-semibold">
-                             <Link href={`/read/${slug}/1`}>
-                                 <BookOpen className="mr-2 h-5 w-5" /> Read First Chapter
-                             </Link>
-                         </Button>
-                         <Button
-                             variant={isInLibrary ? "secondary" : "outline"}
-                             size="lg"
-                             className="w-full text-base font-semibold"
-                             onClick={handleToggleLibrary}
-                             disabled={!user || isTogglingLibrary}
-                          >
-                              {isTogglingLibrary ? (
-                                  <Loader2 className="mr-2 h-5 w-5 animate-spin"/>
-                              ) : isInLibrary ? (
-                                 <>
-                                     <CheckCircle className="mr-2 h-5 w-5 text-green-600" /> In Library
-                                 </>
-                              ) : (
-                                 <>
-                                     <PlusCircle className="mr-2 h-5 w-5" /> Add to Library
-                                 </>
-                              )}
-                              {!user && <span className="text-xs ml-2">(Log in)</span>}
-                          </Button>
-                      </div>
-
-                      {/* Share Buttons */}
-                      <div className="space-y-2">
-                          <p className="text-sm font-medium text-center text-muted-foreground">Share this story:</p>
-                           <div className="flex justify-center gap-3">
-                               <Button variant="outline" size="icon" onClick={() => handleShareStory('twitter')} title="Share on Twitter">
-                                   <Twitter className="h-4 w-4" />
-                               </Button>
-                                <Button variant="outline" size="icon" onClick={() => handleShareStory('facebook')} title="Share on Facebook">
-                                   <Facebook className="h-4 w-4" />
-                               </Button>
-                                <Button variant="outline" size="icon" onClick={handleCopyUrl} title="Copy Link">
-                                   <Copy className="h-4 w-4" />
-                               </Button>
-                                {navigator.share && (
-                                    <Button variant="outline" size="icon" onClick={() => handleShareStory('web')} title="Share">
-                                        <Share2 className="h-4 w-4" />
-                                    </Button>
-                                )}
-                            </div>
+                            />
                         </div>
+                    </Card>
 
-                      {/* Stats Card */}
-                      <Card className="border border-border/80">
-                         <CardContent className="p-4 space-y-3 text-sm">
-                              <div className="flex items-center justify-between">
-                                 <span className="text-muted-foreground font-medium flex items-center gap-2"><Eye className="w-4 h-4" /> Reads</span>
-                                 <span className="font-bold">{story.reads?.toLocaleString() || 0}</span>
-                              </div>
-                              <Separator />
-                              <div className="flex items-center justify-between">
-                                 <span className="text-muted-foreground font-medium flex items-center gap-2"><List className="w-4 h-4" /> Parts</span>
-                                 <span className="font-bold">{story.chapters}</span>
-                              </div>
-                             <Separator />
-                             <div className="flex items-center justify-between">
-                                 <span className="text-muted-foreground font-medium">Updated</span>
-                                <span className="font-semibold">{new Date(story.lastUpdated).toLocaleDateString()}</span>
-                             </div>
-                         </CardContent>
-                      </Card>
+                    <div className="space-y-3">
+                        <Button size="lg" asChild className="w-full bg-primary text-primary-foreground hover:bg-primary/90 text-base font-semibold shadow-md">
+                            <Link href={`/read/${slug}/1`}>
+                                <BookOpen className="mr-2 h-5 w-5" /> Start Reading
+                            </Link>
+                        </Button>
+                        <Button
+                            variant={isInLibrary ? "secondary" : "outline"}
+                            size="lg"
+                            className="w-full text-base font-semibold border-primary/50 hover:border-primary"
+                            onClick={handleToggleLibrary}
+                            disabled={!user || isTogglingLibrary}
+                        >
+                            {isTogglingLibrary ? <Loader2 className="mr-2 h-5 w-5 animate-spin"/> : (
+                                isInLibrary ? <CheckCircle className="mr-2 h-5 w-5 text-green-500" /> : <Bookmark className="mr-2 h-5 w-5" />
+                            )}
+                            {isInLibrary ? 'In Library' : 'Add to Library'}
+                            {!user && <span className="text-xs ml-1 opacity-70">(Log in)</span>}
+                        </Button>
+                    </div>
 
-                      {/* Tags Card */}
-                      {story.tags && story.tags.length > 0 && (
-                         <Card className="border border-border/80">
-                             <CardHeader className="p-4 pb-2">
-                                <CardTitle className="text-base font-semibold">Tags</CardTitle>
-                             </CardHeader>
-                             <CardContent className="p-4 pt-0">
-                                <div className="flex flex-wrap gap-2">
-                                     {story.tags.map(tag => (
-                                        <Link key={tag} href={`/browse?tags=${encodeURIComponent(tag)}`}>
-                                             <Badge variant="secondary" className="cursor-pointer hover:bg-accent hover:text-accent-foreground transition-colors">
-                                                 #{tag.toLowerCase()}
-                                             </Badge>
-                                         </Link>
-                                     ))}
-                                 </div>
-                             </CardContent>
-                         </Card>
-                      )}
-                  </div>
-
-                {/* Right Column: Summary, Chapters, Comments */}
-                <div className="lg:col-span-8 xl:col-span-9 space-y-8">
-                    {/* Summary Card */}
-                    <Card className="border border-border/80 shadow-sm">
-                         <CardHeader>
-                             <CardTitle className="text-xl font-semibold">Summary</CardTitle>
-                         </CardHeader>
-                         <CardContent>
-                            <p className="text-base leading-relaxed whitespace-pre-line text-foreground/90">{story.description}</p>
-                         </CardContent>
-                     </Card>
-
-                     {/* Chapters Card */}
-                     <Card className="border border-border/80 shadow-sm">
-                         <CardHeader className="border-b border-border/80">
-                             <CardTitle className="flex items-center gap-2 text-xl font-semibold">
-                                 <List className="w-5 h-5" /> Table of Contents ({story.chaptersData.length})
-                             </CardTitle>
-                         </CardHeader>
-                         <CardContent className="p-0">
-                             <ul className="divide-y divide-border/80">
-                                {story.chaptersData.map((chapter) => (
-                                     <li key={chapter.id}>
-                                         <Link href={`/read/${slug}/${chapter.order}`} className="flex justify-between items-center p-4 hover:bg-secondary transition-colors duration-150 group">
-                                            <span className="font-medium group-hover:text-primary">{chapter.order}. {chapter.title}</span>
-                                             {/* Placeholder for chapter read status/length */}
-                                             {/* <span className="text-sm text-muted-foreground"></span> */}
-                                         </Link>
-                                     </li>
-                                 ))}
-                                 {story.chaptersData.length === 0 && (
-                                     <li className="p-4 text-center text-muted-foreground">No chapters available yet.</li>
-                                 )}
-                             </ul>
-                         </CardContent>
-                     </Card>
-
-                     {/* Your Rating */}
+                    {/* Story Stats */}
                      <Card>
-                         <CardHeader>
-                             <CardTitle className="text-xl font-semibold">Your Rating</CardTitle>
-                         </CardHeader>
-                         <CardContent>
-                             <div className="flex items-center gap-2 pt-2">
-                                {[1, 2, 3, 4, 5].map((star) => (
-                                     <Button
-                                        key={star}
-                                         variant="ghost"
-                                         size="icon"
-                                         onClick={() => handleRateStory(star)}
-                                         disabled={!user || isSubmittingRating}
-                                         className={`h-8 w-8 p-0 ${!user ? 'cursor-not-allowed opacity-50' : ''}`}
-                                         aria-label={`Rate story ${star} stars`}
-                                     >
-                                         <Star
-                                             className={`h-6 w-6 transition-colors ${star <= rating ? 'fill-primary text-primary' : 'text-muted-foreground/50'} ${user ? 'hover:text-primary/80' : ''}`}
-                                         />
-                                     </Button>
-                                 ))}
-                                 {isSubmittingRating && <Loader2 className="h-5 w-5 animate-spin text-muted-foreground ml-2" />}
+                        <CardContent className="p-4 space-y-2 text-sm">
+                             <div className="flex items-center justify-between">
+                                 <span className="text-muted-foreground flex items-center gap-1.5"><Eye className="w-4 h-4" /> Reads</span>
+                                 <span className="font-semibold">{story.reads?.toLocaleString() || 0}</span>
                              </div>
-                             {!user && <p className="text-sm text-muted-foreground mt-2"><Link href="/login" className="text-primary underline">Log in</Link> to rate this story.</p>}
+                             <Separator/>
+                             <div className="flex items-center justify-between">
+                                 <span className="text-muted-foreground flex items-center gap-1.5"><List className="w-4 h-4" /> Chapters</span>
+                                 <span className="font-semibold">{story.chapters}</span>
+                             </div>
+                             <Separator/>
+                             <div className="flex items-center justify-between">
+                                <span className="text-muted-foreground flex items-center gap-1.5"><Star className="w-4 h-4" /> Rating</span>
+                                 <span className="font-semibold">{displayRating} ({story.totalRatings || 0})</span>
+                             </div>
+                             <Separator/>
+                             <div className="flex items-center justify-between">
+                                <span className="text-muted-foreground">Status</span>
+                                 <Badge variant={story.status === 'Completed' ? "secondary" : "outline"} className="capitalize text-xs">
+                                   {story.status}
+                                 </Badge>
+                             </div>
+                              <Separator/>
+                              <div className="flex items-center justify-between">
+                                 <span className="text-muted-foreground">Updated</span>
+                                 <span className="font-semibold">{new Date(story.lastUpdated).toLocaleDateString()}</span>
+                              </div>
                          </CardContent>
                      </Card>
 
-                     {/* Comments Card */}
-                     <Card className="border border-border/80 shadow-sm">
-                         <CardHeader className="border-b border-border/80">
-                             <CardTitle className="flex items-center gap-2 text-xl font-semibold">
-                                 <MessageSquare className="w-5 h-5" /> Comments ({comments.length})
-                             </CardTitle>
-                         </CardHeader>
-                         <CardContent className="p-5 space-y-6">
-                             {user ? (
-                                <div className="flex gap-3 items-start">
-                                     <Avatar className="mt-1">
-                                         <AvatarImage src={user.avatarUrl || undefined} alt={user.name || 'User'} data-ai-hint="user profile avatar"/>
-                                         <AvatarFallback>{user.name?.substring(0, 1).toUpperCase() || 'U'}</AvatarFallback>
-                                     </Avatar>
-                                     <div className="flex-1 space-y-2">
-                                         <Textarea
-                                             placeholder="Add a comment about the story..."
-                                             value={commentText}
-                                             onChange={(e) => setCommentText(e.target.value)}
-                                             rows={3}
-                                             className="w-full"
-                                             disabled={isSubmittingComment}
-                                         />
-                                         <Button onClick={handleCommentSubmit} size="sm" disabled={commentText.trim() === '' || isSubmittingComment}>
-                                             {isSubmittingComment ? <Loader2 className="h-4 w-4 mr-1 animate-spin"/> : <Send className="h-4 w-4 mr-1" />} Post Comment
-                                         </Button>
-                                     </div>
-                                 </div>
-                             ) : (
-                                 <div className="text-center p-4 border border-dashed rounded-md">
-                                     <p className="text-muted-foreground">
-                                         <Link href="/login" className="text-primary font-medium underline">Log in</Link> or{' '}
-                                         <Link href="/signup" className="text-primary font-medium underline">Sign up</Link> to leave a comment.
-                                     </p>
-                                 </div>
-                             )}
-                             <div className="space-y-4 pt-4">
-                                 {comments.length === 0 && (
-                                     <p className="text-center text-sm text-muted-foreground italic">No story comments yet.</p>
-                                 )}
-                                 {comments.map((comment) => (
-                                    <div key={comment.id} className="flex gap-3 items-start">
-                                        <Avatar className="h-9 w-9">
-                                             <AvatarImage src={comment.userAvatar || undefined} alt={comment.userName || 'User'} data-ai-hint="commenter avatar"/>
-                                             <AvatarFallback>{comment.userName?.substring(0, 1).toUpperCase() || 'U'}</AvatarFallback>
-                                         </Avatar>
-                                         <div className="p-3 rounded-md bg-secondary/50 border w-full">
-                                             <p className="font-semibold text-sm">{comment.userName}</p>
-                                             <p className="text-sm text-foreground/80 mt-1 whitespace-pre-line">{comment.text}</p>
-                                             <p className="text-xs text-muted-foreground mt-2">{new Date(comment.timestamp).toLocaleString()}</p>
-                                         </div>
-                                     </div>
-                                ))}
+                    {/* Tags */}
+                    {story.tags && story.tags.length > 0 && (
+                        <Card>
+                            <CardHeader className="p-4 pb-2"><CardTitle className="text-base font-semibold">Tags</CardTitle></CardHeader>
+                            <CardContent className="p-4 pt-0">
+                                <div className="flex flex-wrap gap-2">
+                                    {story.tags.map(tag => (
+                                        <Link key={tag} href={`/browse?tags=${encodeURIComponent(tag)}`} passHref>
+                                            <Badge variant="secondary" className="hover:bg-accent hover:text-accent-foreground transition-colors cursor-pointer">
+                                                #{tag.toLowerCase()}
+                                            </Badge>
+                                        </Link>
+                                    ))}
+                                </div>
+                            </CardContent>
+                        </Card>
+                    )}
+                </aside>
+
+                {/* Right Column: Summary, Chapters, Author, Comments */}
+                <main className="md:col-span-8 lg:col-span-9 space-y-8">
+                    <Card>
+                        <CardHeader><CardTitle className="text-xl font-semibold">Summary</CardTitle></CardHeader>
+                        <CardContent className="prose dark:prose-invert max-w-none">
+                            <p className="text-base leading-relaxed whitespace-pre-line">{story.description}</p>
+                        </CardContent>
+                    </Card>
+
+                    {/* Author Card */}
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="text-xl font-semibold">About the Author</CardTitle>
+                        </CardHeader>
+                        <CardContent className="flex items-center gap-4">
+                            <Link href={`/profile/${story.author.id}`}>
+                                <Avatar className="h-16 w-16 border-2 border-primary">
+                                    <AvatarImage src={story.author.avatarUrl} alt={story.author.name} data-ai-hint="author avatar medium"/>
+                                    <AvatarFallback className="text-xl">{story.author.name.substring(0, 1).toUpperCase()}</AvatarFallback>
+                                </Avatar>
+                            </Link>
+                            <div>
+                                <Link href={`/profile/${story.author.id}`} className="text-lg font-semibold text-primary hover:underline">{story.author.name}</Link>
+                                <p className="text-sm text-muted-foreground">{story.authorFollowers.toLocaleString()} Followers</p>
+                                {/* <Button variant="outline" size="sm" className="mt-2"><Heart className="mr-2 h-4 w-4"/> Follow (Soon)</Button> */}
                             </div>
                         </CardContent>
                     </Card>
-                </div>
-            </section>
+
+                    <Card>
+                        <CardHeader className="border-b">
+                            <CardTitle className="flex items-center gap-2 text-xl font-semibold">
+                                <List className="w-5 h-5" /> Table of Contents ({story.chaptersData.length})
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent className="p-0 max-h-[400px] overflow-y-auto">
+                            <ul className="divide-y">
+                                {story.chaptersData.map((chapter, index) => (
+                                    <li key={chapter.id}>
+                                        <Link href={`/read/${slug}/${chapter.order}`} className="flex justify-between items-center p-4 hover:bg-secondary/50 transition-colors duration-150 group">
+                                            <span className="font-medium group-hover:text-primary">{chapter.order}. {chapter.title}</span>
+                                            <span className="text-xs text-muted-foreground">{/* Add word count or date later */}</span>
+                                        </Link>
+                                    </li>
+                                ))}
+                                {story.chaptersData.length === 0 && (
+                                    <li className="p-6 text-center text-muted-foreground italic">No chapters published yet.</li>
+                                )}
+                            </ul>
+                        </CardContent>
+                    </Card>
+
+                     {/* Your Rating for the Story */}
+                     <Card>
+                         <CardHeader><CardTitle className="text-xl font-semibold">Rate This Story</CardTitle></CardHeader>
+                         <CardContent>
+                             <div className="flex items-center gap-1 pt-1">
+                                {[1, 2, 3, 4, 5].map((starVal) => (
+                                     <Button
+                                        key={starVal} variant="ghost" size="icon"
+                                        onClick={() => handleRateStory(starVal)}
+                                        disabled={!user || isSubmittingRating}
+                                        className={`p-1 h-auto w-auto ${!user ? 'cursor-not-allowed opacity-60' : ''}`}
+                                        aria-label={`Rate story ${starVal} stars`}
+                                     >
+                                         <Star className={`h-7 w-7 transition-colors ${starVal <= rating ? 'fill-primary text-primary' : 'text-muted-foreground/40'} ${user ? 'hover:text-primary/70' : ''}`} />
+                                     </Button>
+                                 ))}
+                                 {isSubmittingRating && <Loader2 className="h-6 w-6 animate-spin text-muted-foreground ml-3" />}
+                             </div>
+                             {!user && <p className="text-sm text-muted-foreground mt-2"><Link href="/login" className="text-primary underline">Log in</Link> to rate.</p>}
+                         </CardContent>
+                     </Card>
+
+
+                     {/* Story Comments */}
+                    <Card>
+                        <CardHeader className="border-b">
+                            <CardTitle className="flex items-center gap-2 text-xl font-semibold">
+                                <MessageSquare className="w-5 h-5" /> Story Comments ({comments.length})
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent className="p-5 space-y-6">
+                            {user ? (
+                                <div className="flex gap-4 items-start">
+                                    <Avatar className="mt-1 h-10 w-10">
+                                        <AvatarImage src={user.avatarUrl || undefined} alt={user.name || 'User'} data-ai-hint="user comment avatar"/>
+                                        <AvatarFallback>{user.name?.substring(0, 1).toUpperCase() || 'U'}</AvatarFallback>
+                                    </Avatar>
+                                    <div className="flex-1 space-y-2">
+                                        <Textarea
+                                            placeholder="Share your thoughts on the story..."
+                                            value={commentText}
+                                            onChange={(e) => setCommentText(e.target.value)}
+                                            rows={3}
+                                            disabled={isSubmittingComment}
+                                        />
+                                        <Button onClick={handleCommentSubmit} size="sm" disabled={commentText.trim() === '' || isSubmittingComment}>
+                                            {isSubmittingComment ? <Loader2 className="h-4 w-4 mr-2 animate-spin"/> : <Send className="h-4 w-4 mr-2" />} Post Comment
+                                        </Button>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="text-center p-6 border border-dashed rounded-md bg-secondary/30">
+                                    <p className="text-muted-foreground">
+                                        <Link href="/login" className="text-primary font-medium hover:underline">Log in</Link> or{' '}
+                                        <Link href="/signup" className="text-primary font-medium hover:underline">Sign up</Link> to leave a comment.
+                                    </p>
+                                </div>
+                            )}
+                            <div className="space-y-5">
+                                {comments.length === 0 && !user && (
+                                    <p className="text-center text-sm text-muted-foreground italic py-4">No comments yet.</p>
+                                )}
+                                {comments.map((comment) => (
+                                   <div key={comment.id} className="flex gap-3 items-start">
+                                       <Link href={`/profile/${comment.userId}`}>
+                                          <Avatar className="h-9 w-9">
+                                               <AvatarImage src={comment.userAvatar || undefined} alt={comment.userName || 'User'} data-ai-hint="commenter story avatar"/>
+                                               <AvatarFallback>{comment.userName?.substring(0, 1).toUpperCase() || 'U'}</AvatarFallback>
+                                           </Avatar>
+                                       </Link>
+                                        <div className="p-3.5 rounded-lg bg-secondary/50 border w-full">
+                                            <div className="flex items-center justify-between mb-1">
+                                               <Link href={`/profile/${comment.userId}`} className="font-semibold text-sm hover:underline">{comment.userName}</Link>
+                                               <p className="text-xs text-muted-foreground">{new Date(comment.timestamp).toLocaleDateString()}</p>
+                                            </div>
+                                            <p className="text-sm text-foreground/90 whitespace-pre-line">{comment.text}</p>
+                                        </div>
+                                    </div>
+                               ))}
+                           </div>
+                       </CardContent>
+                   </Card>
+
+                   {/* Share Section */}
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="text-xl font-semibold flex items-center gap-2"><Share2 className="w-5 h-5"/> Share Story</CardTitle>
+                        </CardHeader>
+                        <CardContent className="flex flex-wrap gap-3">
+                            <Button variant="outline" onClick={() => handleShareStory('twitter')}><Twitter className="mr-2 h-4 w-4"/> Twitter/X</Button>
+                            <Button variant="outline" onClick={() => handleShareStory('facebook')}><Facebook className="mr-2 h-4 w-4"/> Facebook</Button>
+                            <Button variant="outline" onClick={() => handleShareStory('copy')}><Copy className="mr-2 h-4 w-4"/> Copy Link</Button>
+                            {navigator.share && (
+                                <Button variant="outline" onClick={() => handleShareStory('web')}><Share2 className="mr-2 h-4 w-4" /> More...</Button>
+                            )}
+                        </CardContent>
+                    </Card>
+
+                </main>
+            </div>
         </div>
     );
 };
 
-// Wrap with Suspense for client components that might use hooks like useSearchParams
 const SuspendedStoryDetailPage: NextPage<StoryPageProps> = (props) => (
-    <Suspense fallback={<div className="flex items-center justify-center min-h-[calc(100vh-10rem)]"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>}>
+    <Suspense fallback={<div className="flex items-center justify-center min-h-[calc(100vh-10rem)]"><Loader2 className="h-12 w-12 animate-spin text-primary" /></div>}>
         <StoryDetailPage {...props} />
     </Suspense>
 );
