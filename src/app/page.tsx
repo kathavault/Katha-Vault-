@@ -1,3 +1,4 @@
+
 import type { NextPage } from 'next';
 import StoryCard, { type Story } from '@/components/story/story-card';
 import { Button } from '@/components/ui/button';
@@ -11,14 +12,13 @@ const mockStories: Story[] = [
     title: 'The Crimson Cipher',
     author: 'Alex Quill',
     description: 'A thrilling adventure into the unknown depths of ancient ruins, where secrets lie buried.',
-    // If you have a specific cover image for "The Crimson Cipher", replace the URL below.
-    coverImageUrl: 'YOUR_NOVEL_COVER_IMAGE_URL_HERE', // Replace this with the actual URL of your novel cover
+    coverImageUrl: 'https://picsum.photos/seed/crimson-cipher/400/600', // Updated placeholder URL
     genre: 'Adventure',
     reads: 12567,
     chapters: 25,
     tags: ['Mystery', 'Action', 'Ancient'],
     slug: 'the-crimson-cipher',
-    dataAiHint: 'adventure mystery book cover', // You can also update this hint if you change the image
+    dataAiHint: 'adventure mystery book cover',
   },
   {
     id: '2',
