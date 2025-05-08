@@ -1,7 +1,7 @@
 'use client';
-
+import { Skeleton } from '@/components/ui/skeleton'; // Import Skeleton
 import React, { useEffect, useState, Suspense, use } from 'react';
-import Link from 'next/link';
+import Link from 'next/link'; // Import Link
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
@@ -26,12 +26,11 @@ import {
 } from 'lucide-react';
 import Image from 'next/image';
 import { useAuth } from '@/hooks/use-auth';
-import { Textarea } from '@/components/ui/textarea';
+import { Textarea } from '@/components/ui/textarea'; // Import Textarea
 import { useToast } from '@/hooks/use-toast';
 import { validateCommentData, validateRatingData } from '@/services/validationService';
-import { Skeleton } from '@/components/ui/skeleton';
 import { StoryDetailsResult, StoryCommentData } from './types';
-import { fetchStoryDetails, submitStoryComment, submitStoryRating, toggleLibraryStatus } from '@/lib/storyService';
+import { fetchStoryDetails, submitStoryComment, submitStoryRating, toggleLibraryStatus } from '@/lib/storyService'; // Import services
 
 interface StoryDetailPageProps {
     slug: string;
@@ -340,7 +339,7 @@ const StoryDetailPage: React.FC<StoryDetailPageProps> = ({ slug }) => {
                          </CardContent>
                      </Card>
 
-                    {/* Tags */}
+                    {/* Tags *}
                     {story.tags && story.tags.length > 0 && (
                         <Card>
                             <CardHeader className="p-4 pb-2"><CardTitle className="text-base font-semibold">Tags</CardTitle></CardHeader>
@@ -486,8 +485,7 @@ const StoryDetailPage: React.FC<StoryDetailPageProps> = ({ slug }) => {
     );
 };
 
-// Loader component for Suspense boundary
-const StoryDetailLoader: React.FC = () => (
+export const StoryDetailLoader: React.FC = () => (
      <div className="container mx-auto py-6 md:py-10">
         <section className="mb-8 md:mb-12 text-center space-y-3">
            <Skeleton className="h-10 w-3/4 mx-auto" />
@@ -525,3 +523,42 @@ const StoryDetailLoader: React.FC = () => (
  );
 
 export default StoryDetailPage;
+
+// Loader component for Suspense boundary
+export const StoryDetailLoader: React.FC = () => (
+    <div className="container mx-auto py-6 md:py-10">
+       <section className="mb-8 md:mb-12 text-center space-y-3">
+          <Skeleton className="h-10 w-3/4 mx-auto" />
+          <Skeleton className="h-6 w-1/4 mx-auto" />
+       </section>
+        <section className="mb-8 md:mb-12 flex justify-center">
+           <Skeleton className="w-full max-w-xs sm:max-w-sm md:max-w-md aspect-[2/3] rounded-lg" />
+        </section>
+        <section className="mb-8 md:mb-12 flex flex-col items-center gap-4">
+             <Skeleton className="h-10 w-48" />
+              <div className="flex gap-3">
+                  <Skeleton className="h-8 w-24" />
+                  <Skeleton className="h-8 w-24" />
+                  <Skeleton className="h-8 w-24" />
+              </div>
+         </section>
+
+         <div className="grid grid-cols-1 md:grid-cols-12 gap-6 md:gap-8">
+             <aside className="md:col-span-4 lg:col-span-3 space-y-6">
+                 <div className="space-y-3 sticky top-20">
+                     <Skeleton className="h-12 w-full" />
+                     <Skeleton className="h-12 w-full" />
+                 </div>
+                  <Card><CardContent className="p-4 space-y-3"><Skeleton className="h-5 w-full" /><Skeleton className="h-5 w-full" /><Skeleton className="h-5 w-full" /></CardContent></Card>
+                  <Card><CardContent className="p-4"><Skeleton className="h-6 w-1/2" /></CardContent></Card>
+              </aside>
+             <main className="md:col-span-8 lg:col-span-9 space-y-8">
+                 <Card><CardHeader><Skeleton className="h-6 w-1/4" /></CardHeader><CardContent><Skeleton className="h-20 w-full" /></CardContent></Card>
+                 <Card><CardHeader><Skeleton className="h-6 w-1/4" /></CardHeader><CardContent className="flex items-center gap-4"><Skeleton className="h-16 w-16 rounded-full" /><div className="space-y-2"><Skeleton className="h-5 w-32" /><Skeleton className="h-4 w-24" /></div></CardContent></Card>
+                  <Card><CardHeader><Skeleton className="h-6 w-1/3" /></CardHeader><CardContent className="space-y-2"><Skeleton className="h-10 w-full" /><Skeleton className="h-10 w-full" /><Skeleton className="h-10 w-full" /></CardContent></Card>
+                  <Card><CardHeader><Skeleton className="h-6 w-1/4" /></CardHeader><CardContent className="space-y-4"><Skeleton className="h-24 w-full" /><Skeleton className="h-10 w-full" /><Skeleton className="h-10 w-full" /></CardContent></Card>
+              </main>
+         </div>
+    </div>
+);
+
