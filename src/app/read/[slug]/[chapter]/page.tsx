@@ -39,42 +39,42 @@ interface ReadPageProps {
 }
 
 // Required for static export with dynamic routes for chapters
-// export async function generateStaticParams(): Promise<{ slug: string; chapter: string }[]> {
-//   console.log("generateStaticParams for /read/[slug]/[chapter] running...");
-//   const stories = await getStories(); // Get slugs
-//   if (!stories || stories.length === 0) {
-//     console.warn("No stories found for generateStaticParams in /read/[slug]/[chapter].");
-//     return [];
-//   }
+export async function generateStaticParams(): Promise<{ slug: string; chapter: string }[]> {
+  console.log("generateStaticParams for /read/[slug]/[chapter] running...");
+  const stories = await getStories(); // Get slugs
+  if (!stories || stories.length === 0) {
+    console.warn("No stories found for generateStaticParams in /read/[slug]/[chapter].");
+    return [];
+  }
 
-//   const allParams: { slug: string; chapter: string }[] = [];
+  const allParams: { slug: string; chapter: string }[] = [];
 
-//   for (const story of stories) {
-//     if (!story.slug) continue;
-//     try {
-//       // Fetch basic chapter info (like chapter count or orders) for each story
-//       // This requires a function like `fetchStoryChaptersSummary(story.slug)`
-//       // For now, let's assume a max chapter count or fetch it (can be slow)
-//       const storyDetails = await fetchStoryDetails(story.slug); // Fetch details to get chapter count/orders
-//       if (storyDetails && storyDetails.chaptersData) {
-//         storyDetails.chaptersData.forEach(chapterSummary => {
-//             if (chapterSummary.order) { // Use order field
-//                  allParams.push({ slug: story.slug, chapter: chapterSummary.order.toString() });
-//             }
-//         });
-//       } else {
-//         console.warn(`No chapters found for story slug: ${story.slug}`);
-//         // Optionally generate a default chapter 1 param if needed
-//         // allParams.push({ slug: story.slug, chapter: '1' });
-//       }
-//     } catch (error) {
-//       console.error(`Error fetching chapters for story slug ${story.slug} in generateStaticParams:`, error);
-//     }
-//   }
+  for (const story of stories) {
+    if (!story.slug) continue;
+    try {
+      // Fetch basic chapter info (like chapter count or orders) for each story
+      // This requires a function like `fetchStoryChaptersSummary(story.slug)`
+      // For now, let's assume a max chapter count or fetch it (can be slow)
+      const storyDetails = await fetchStoryDetails(story.slug); // Fetch details to get chapter count/orders
+      if (storyDetails && storyDetails.chaptersData) {
+        storyDetails.chaptersData.forEach(chapterSummary => {
+            if (chapterSummary.order) { // Use order field
+                 allParams.push({ slug: story.slug, chapter: chapterSummary.order.toString() });
+            }
+        });
+      } else {
+        console.warn(`No chapters found for story slug: ${story.slug}`);
+        // Optionally generate a default chapter 1 param if needed
+        // allParams.push({ slug: story.slug, chapter: '1' });
+      }
+    } catch (error) {
+      console.error(`Error fetching chapters for story slug ${story.slug} in generateStaticParams:`, error);
+    }
+  }
 
-//   console.log(`Generated ${allParams.length} static params for /read/[slug]/[chapter]:`, allParams.slice(0, 20)); // Log first 20
-//   return allParams;
-// }
+  console.log(`Generated ${allParams.length} static params for /read/[slug]/[chapter]:`, allParams.slice(0, 20)); // Log first 20
+  return allParams;
+}
 
 
 const formatContent = (text: string): React.ReactNode[] => {
@@ -82,14 +82,18 @@ const formatContent = (text: string): React.ReactNode[] => {
 
   const paragraphs = text.trim().split(/\n\s*\n/);
   return paragraphs.map((p, i) => {
-    if (p.startsWith('&gt; ')) {
-        return <blockquote key={i} className="pl-4 italic border-l-4 my-4">{p.substring(4)}</blockquote>; // Changed from 2 to 4 for '&gt; '
+    // Blockquotes
+    if (p.startsWith('> ')) {
+      const blockquoteElement = <blockquote key={i} className="pl-4 italic border-l-4 my-4">{p.substring(2)}</blockquote>;
+      return blockquoteElement;
     }
+    // Horizontal Rules
     if (p === '---') {
-        return <hr key={i} className="my-6" />;
+      const hrElement = <hr key={i} className="my-6" />;
+      return hrElement;
     }
 
-    // Handle bold and italics within paragraphs using simple string splitting and element creation
+    // Regular Paragraphs with inline formatting
     const nodes: React.ReactNode[] = [];
     let remainingText = p;
     let keyCounter = 0;
@@ -113,6 +117,7 @@ const formatContent = (text: string): React.ReactNode[] => {
         if (match) {
             const textBefore = remainingText.substring(0, match.index!);
             if (textBefore) {
+                // Handle potential newlines within the textBefore segment
                 nodes.push(<React.Fragment key={`text-${i}-${keyCounter++}`}>{textBefore.split('\n').map((line, idx) => <React.Fragment key={idx}>{line}{idx < textBefore.split('\n').length - 1 && <br />}</React.Fragment>)}</React.Fragment>);
             }
             const content = match[1];
@@ -122,12 +127,13 @@ const formatContent = (text: string): React.ReactNode[] => {
             );
             remainingText = remainingText.substring(match.index! + match[0].length);
         } else {
+            // Handle potential newlines in the final remainingText segment
              nodes.push(<React.Fragment key={`text-${i}-${keyCounter++}`}>{remainingText.split('\n').map((line, idx) => <React.Fragment key={idx}>{line}{idx < remainingText.split('\n').length - 1 && <br />}</React.Fragment>)}</React.Fragment>);
              remainingText = '';
         }
     }
-
-     return <p key={i}>{nodes}</p>;
+     const pElement = <p key={i}>{nodes}</p>;
+     return pElement;
   });
 };
 
