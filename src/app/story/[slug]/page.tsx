@@ -31,7 +31,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast'; // Ensure this path is correct
 import { validateCommentData, validateRatingData } from '@/services/validationService'; // Ensure this path is correct
 import { Skeleton } from '@/components/ui/skeleton'; // Ensure this path is correct
-import type { StoryDetailsResult, StoryCommentData } from '@/types'; // Import types directly
+import type { StoryDetailsResult, StoryCommentData, Author, ChapterSummary } from '@/types'; // Import types directly
 import { fetchStoryDetails, submitStoryComment, submitStoryRating, toggleLibraryStatus } from '@/lib/storyService'; // Ensure this path is correct
 
 
@@ -121,11 +121,7 @@ const StoryDetailPageContent: React.FC<{ slug: string }> = ({ slug }) => {
                 console.error(`Error in fetchStory useEffect for slug "${slug}":`, error);
                  setErrorLoading("An unexpected error occurred while loading the story.");
                 setStory(null);
-                toast({
-                    title: "Error Loading Story",
-                    description: "Could not load story details. Please try again later.",
-                    variant: "destructive",
-                });
+                // Toast is shown within fetchStoryDetails now if it throws
             } finally {
                 setIsLoading(false);
             }
@@ -228,7 +224,7 @@ const StoryDetailPageContent: React.FC<{ slug: string }> = ({ slug }) => {
     };
 
     const handleShareStory = async (platform: 'web' | 'facebook' | 'twitter' | 'copy') => {
-        if (!story || !story.author) {
+        if (!story?.author) { // Check if story and author exist
             toast({ title: "Error", description: "Story data not available for sharing.", variant: "destructive" });
             return;
         }
@@ -287,8 +283,8 @@ const StoryDetailPageContent: React.FC<{ slug: string }> = ({ slug }) => {
     // --- Render Logic ---
     // Use combined loading state
     if (isLoading || authLoading) {
-        // Return the loader directly, Suspense boundary handles this at the page level
-        return <StoryDetailLoader />;
+        // The Suspense boundary at the page level handles showing the loader
+        return null; // Return null while loading, Suspense fallback takes over
     }
 
      // Handle error state after loading finishes
@@ -301,7 +297,7 @@ const StoryDetailPageContent: React.FC<{ slug: string }> = ({ slug }) => {
         return <div className="text-center py-20 text-xl text-muted-foreground">Story not found.</div>;
     }
 
-    // Ensure story.author exists before accessing its properties
+    // Ensure story.author exists before accessing its properties (should be guaranteed by fetch logic now, but good practice)
     const authorName = story.author?.name || 'Unknown Author';
     const authorId = story.author?.id || 'unknown';
     const authorAvatar = story.author?.avatarUrl;
@@ -318,9 +314,12 @@ const StoryDetailPageContent: React.FC<{ slug: string }> = ({ slug }) => {
             {/* Header Section - Title and Author */}
             <section className="mb-8 md:mb-12 text-center">
                 <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold leading-tight text-foreground mb-2">{story.title}</h1>
-                <div className="text-lg text-muted-foreground">
-                    by <Link href={`/profile/${authorId}`} className="text-primary hover:underline font-medium">{authorName}</Link>
-                </div>
+                 {/* Ensure author exists before creating link */}
+                 {story.author && (
+                    <div className="text-lg text-muted-foreground">
+                        by <Link href={`/profile/${authorId}`} className="text-primary hover:underline font-medium">{authorName}</Link>
+                    </div>
+                 )}
             </section>
 
             {/* Cover Image Section */}
@@ -386,7 +385,7 @@ const StoryDetailPageContent: React.FC<{ slug: string }> = ({ slug }) => {
                             asChild
                             className="w-full bg-primary text-primary-foreground hover:bg-primary/90 text-base font-semibold shadow-md"
                             // Disable button if no chapters exist
-                            disabled={story.chaptersData.length === 0}
+                            disabled={!story.chaptersData || story.chaptersData.length === 0}
                             >
                             {/* Link to the first chapter or # if no chapters */}
                              <Link href={story.chaptersData?.length > 0 ? `/read/${slug}/${story.chaptersData[0].order}` : '#'}>
@@ -418,7 +417,7 @@ const StoryDetailPageContent: React.FC<{ slug: string }> = ({ slug }) => {
                              <Separator/>
                              <div className="flex items-center justify-between">
                                  <span className="text-muted-foreground flex items-center gap-1.5"><List className="w-4 h-4" /> Chapters</span>
-                                 <span className="font-semibold">{story.chapters}</span>
+                                 <span className="font-semibold">{story.chapters || 0}</span>
                              </div>
                              <Separator/>
                              <div className="flex items-center justify-between">
@@ -478,36 +477,38 @@ const StoryDetailPageContent: React.FC<{ slug: string }> = ({ slug }) => {
                         </CardContent>
                     </Card>
 
-                    {/* Author Card */}
-                    <Card>
-                        <CardHeader>
-                            <CardTitle className="text-xl font-semibold">About the Author</CardTitle>
-                        </CardHeader>
-                        <CardContent className="flex items-center gap-4">
-                            <Link href={`/profile/${authorId}`}>
-                                <Avatar className="h-16 w-16 border-2 border-primary">
-                                    <AvatarImage src={authorAvatar} alt={authorName} data-ai-hint="author avatar medium"/>
-                                    <AvatarFallback className="text-xl">{authorName?.substring(0, 1).toUpperCase() || 'A'}</AvatarFallback>
-                                </Avatar>
-                            </Link>
-                            <div>
-                                <Link href={`/profile/${authorId}`} className="text-lg font-semibold text-primary hover:underline">{authorName}</Link>
-                                <p className="text-sm text-muted-foreground">{authorFollowers.toLocaleString()} Followers</p>
-                                {/* Follow button logic can be added here */}
-                            </div>
-                        </CardContent>
-                    </Card>
+                    {/* Author Card - Conditionally render if author exists */}
+                     {story.author && (
+                        <Card>
+                            <CardHeader>
+                                <CardTitle className="text-xl font-semibold">About the Author</CardTitle>
+                            </CardHeader>
+                            <CardContent className="flex items-center gap-4">
+                                <Link href={`/profile/${authorId}`}>
+                                    <Avatar className="h-16 w-16 border-2 border-primary">
+                                        <AvatarImage src={authorAvatar} alt={authorName} data-ai-hint="author avatar medium"/>
+                                        <AvatarFallback className="text-xl">{authorName?.substring(0, 1).toUpperCase() || 'A'}</AvatarFallback>
+                                    </Avatar>
+                                </Link>
+                                <div>
+                                    <Link href={`/profile/${authorId}`} className="text-lg font-semibold text-primary hover:underline">{authorName}</Link>
+                                    <p className="text-sm text-muted-foreground">{authorFollowers.toLocaleString()} Followers</p>
+                                    {/* Follow button logic can be added here */}
+                                </div>
+                            </CardContent>
+                        </Card>
+                     )}
 
                     {/* Table of Contents */}
                     <Card>
                         <CardHeader className="border-b">
                             <CardTitle className="flex items-center gap-2 text-xl font-semibold">
-                                <List className="w-5 h-5" /> Table of Contents ({story.chaptersData.length})
+                                <List className="w-5 h-5" /> Table of Contents ({story.chaptersData?.length || 0})
                             </CardTitle>
                         </CardHeader>
                         <CardContent className="p-0 max-h-[400px] overflow-y-auto">
                             <ul className="divide-y">
-                                {story.chaptersData.length > 0 ? (
+                                {story.chaptersData && story.chaptersData.length > 0 ? (
                                   story.chaptersData.map((chapter) => (
                                     <li key={chapter.id}>
                                         <Link href={`/read/${slug}/${chapter.order}`} className="flex justify-between items-center p-4 hover:bg-secondary/50 transition-colors duration-150 group">
@@ -560,10 +561,10 @@ const StoryDetailPageContent: React.FC<{ slug: string }> = ({ slug }) => {
                                 </div>
                             )}
                             <div className="space-y-5">
-                                {comments.length === 0 && (
-                                    <p className="text-center text-sm text-muted-foreground italic py-4">No comments yet. Be the first!</p>
+                                {comments.length === 0 && !user && (
+                                    <p className="text-center text-sm text-muted-foreground italic py-4">No comments yet.</p>
                                 )}
-                                {comments.length > 0 && comments.map((comment) => (
+                                 {comments.length > 0 && comments.map((comment) => (
                                    <div key={comment.id} className="flex gap-3 items-start">
                                        <Link href={`/profile/${comment.userId}`}>
                                           <Avatar className="h-9 w-9">
@@ -597,6 +598,11 @@ const SuspendedStoryDetailPage: NextPage<StoryPageProps> = (props) => {
     const params = use(props.params);
     const { slug } = params; // Now slug is available directly
 
+    // Render the loader if slug is not yet available (though `use` should handle this)
+    if (!slug) {
+        return <StoryDetailLoader />;
+    }
+
     return (
         <Suspense fallback={<StoryDetailLoader />}>
             {/* Pass the resolved slug to the client component */}
@@ -607,3 +613,17 @@ const SuspendedStoryDetailPage: NextPage<StoryPageProps> = (props) => {
 
 export default SuspendedStoryDetailPage;
 
+// Removed generateStaticParams as it caused build errors and might not be suitable
+// if story slugs can change or if fetching all slugs is too slow/expensive.
+// If static export is strictly needed, ensure getStories() in storyService works
+// and doesn't throw errors during build.
+// export async function generateStaticParams() {
+//     const stories = await getStories(); // Assuming getStories fetches slugs
+//     return stories.map((story) => ({
+//         slug: story.slug,
+//     }));
+// }
+
+// // Opt-out of dynamic rendering if using generateStaticParams with export
+// export const dynamic = 'error'; // Or 'force-static' if applicable
+// export const dynamicParams = true; // Allow slugs not generated at build time if needed
