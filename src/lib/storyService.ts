@@ -15,82 +15,32 @@ import {
     limit,
     Timestamp,
     updateDoc,
-    increment
+    increment,
+    collectionGroup, // Import collectionGroup for potential future use (e.g., finding all chapters)
+    runTransaction // Import transaction for atomic updates
 } from 'firebase/firestore';
-import type { Story, Chapter, StoryCommentData } from '@/types'; // Assuming types are defined including StoryCommentData
+import type { Story, Chapter, StoryCommentData, UserProfile, Author, ChapterSummary, StoryDetailsResult, SubmitStoryCommentParams, SubmitStoryRatingParams } from '@/types'; // Consolidated type imports
 
-// Define types used in this service
-interface Author {
-    name: string;
-    id: string;
-    avatarUrl?: string;
-}
-
-
-interface ChapterSummary {
-    id: string;
-    title: string;
-    order: number;
-    wordCount?: number;
-    lastUpdated?: string; // ISO string
-}
-
-// This should match the one in the page component
-interface StoryDetailsResult {
-    id: string;
-    title: string;
-    description: string;
-    genre: string;
-    tags: string[];
-    status: 'Draft' | 'Published' | 'Archived' | 'Ongoing' | 'Completed'; // Added Ongoing/Completed
-    authorId: string;
-    authorName: string; // Ensure this is fetched
-    coverImageUrl?: string;
-    reads?: number;
-    author: Author;
-    authorFollowers: number;
-    chapters: number; // Explicit chapters count
-    chaptersData: ChapterSummary[];
-    lastUpdated: string; // ISO string for consistency
-    averageRating?: number;
-    totalRatings?: number;
-    comments?: StoryCommentData[];
-    userRating?: number;
-    isInLibrary?: boolean;
-    slug: string;
-    dataAiHint?: string;
-    // Ensure all fields from src/types Story are here or correctly mapped
-}
-
-
-
-interface SubmitStoryCommentParams {
-    storyId: string;
-    userId: string;
-    text: string;
-}
-
-interface SubmitStoryRatingParams {
-    storyId: string;
-    userId: string;
-    rating: number;
-}
 
 /**
  * Fetches basic data (including slugs) for all stories.
- * Used primarily for generateStaticParams.
+ * Used primarily for generateStaticParams if static export is enabled.
  */
 export const getStories = async (): Promise<Pick<Story, 'id' | 'slug'>[]> => {
     const storiesRef = collection(db, "stories");
-    // Potentially filter by status === 'Published' if only published stories should be pre-rendered
+    // Consider filtering by status === 'Published' if needed for static generation
     // const q = query(storiesRef, where("status", "==", "Published"));
     const q = query(storiesRef); // Fetch all for now
     try {
         const querySnapshot = await getDocs(q);
+        if (querySnapshot.empty) {
+            console.log("No stories found for generateStaticParams.");
+            return [];
+        }
         return querySnapshot.docs.map(doc => ({
             id: doc.id,
             slug: doc.data().slug || doc.id // Fallback to ID if slug missing
-        }));
+        })).filter(story => story.slug); // Ensure slug exists
     } catch (error) {
         console.error("Error fetching stories for generateStaticParams:", error);
         // Return empty array on error during build to avoid breaking static generation entirely
@@ -110,7 +60,9 @@ export const fetchStoryDetails = async (slug: string, userId?: string | null): P
     }
     console.log(`Fetching story details for slug: ${slug}, userId: ${userId}`);
 
+    let storyId = '';
     try {
+        // 1. Find the story by slug
         const storiesRef = collection(db, "stories");
         const storyQuery = query(storiesRef, where("slug", "==", slug), limit(1));
         const storySnapshot = await getDocs(storyQuery);
@@ -121,84 +73,112 @@ export const fetchStoryDetails = async (slug: string, userId?: string | null): P
         }
         const storyDoc = storySnapshot.docs[0];
         const storyData = storyDoc.data();
-        const storyId = storyDoc.id;
+        storyId = storyDoc.id; // Assign storyId here
         console.log(`Found story with ID: ${storyId}`);
 
-        // Fetch chapters
+        // Validate essential story data
+        if (!storyData || !storyData.authorId || !storyData.authorName) {
+            console.error(`Incomplete story data found for story ID: ${storyId}. Missing authorId or authorName.`);
+            return null; // Return null if essential data is missing
+        }
+
+
+        // 2. Fetch Author Details (Example - assumes author profile is stored separately)
+        // You might store authorName/avatarUrl directly on the story (denormalized) to avoid this extra fetch
+        let author: Author;
+        try {
+            const authorRef = doc(db, "users", storyData.authorId);
+            const authorSnap = await getDoc(authorRef);
+            if (authorSnap.exists()) {
+                const authorData = authorSnap.data() as UserProfile;
+                 author = {
+                    id: authorData.id || storyData.authorId,
+                    name: authorData.name || storyData.authorName || 'Unknown Author', // Prioritize Firestore name, fallback
+                    avatarUrl: authorData.avatarUrl || storyData.authorAvatarUrl, // Check both locations
+                 };
+            } else {
+                 console.warn(`Author profile not found for ID: ${storyData.authorId}. Using denormalized data.`);
+                  author = {
+                     id: storyData.authorId,
+                     name: storyData.authorName, // Use denormalized name from story
+                     avatarUrl: storyData.authorAvatarUrl,
+                  };
+            }
+        } catch (authorError) {
+             console.error(`Error fetching author details for ID ${storyData.authorId}:`, authorError);
+              author = { // Fallback author
+                 id: storyData.authorId,
+                 name: storyData.authorName,
+                 avatarUrl: storyData.authorAvatarUrl,
+              };
+        }
+
+
+        // 3. Fetch chapters summary
         const chaptersRef = collection(db, "stories", storyId, "chapters");
         const chaptersQuery = query(chaptersRef, orderBy("order", "asc"));
         const chaptersSnapshot = await getDocs(chaptersQuery);
         const chaptersData: ChapterSummary[] = chaptersSnapshot.docs.map(docSnap => {
             const chData = docSnap.data();
              const chLastUpdated = chData.lastUpdated;
-             let chLastUpdatedISO: string;
+             let chLastUpdatedISO: string | undefined = undefined;
              if (chLastUpdated instanceof Timestamp) {
                  chLastUpdatedISO = chLastUpdated.toDate().toISOString();
              } else if (typeof chLastUpdated === 'string') {
-                  try {
-                      chLastUpdatedISO = new Date(chLastUpdated).toISOString();
-                  } catch {
-                      chLastUpdatedISO = new Date().toISOString(); // Fallback for invalid date string
-                  }
-             } else {
-                 chLastUpdatedISO = new Date().toISOString(); // Fallback
-             }
+                  try { chLastUpdatedISO = new Date(chLastUpdated).toISOString(); } catch { /* ignore invalid date */ }
+             } // If undefined, it remains undefined
 
             return {
                 id: docSnap.id,
-                title: chData.title || `Chapter ${chData.order}`,
-                order: chData.order,
+                title: chData.title || `Chapter ${chData.order || 'N/A'}`,
+                order: chData.order || 0, // Provide default order
                 wordCount: chData.wordCount || 0,
-                lastUpdated: chLastUpdatedISO
+                lastUpdated: chLastUpdatedISO // Keep as potentially undefined
             };
-        });
+        }).sort((a, b) => a.order - b.order); // Ensure sorting by order
         console.log(`Found ${chaptersData.length} chapters for story ${storyId}`);
 
-        // Fetch comments
+        // 4. Fetch comments for the story
         const commentsRef = collection(db, "stories", storyId, "comments");
-        const commentsQuery = query(commentsRef, orderBy("timestamp", "desc"), limit(20));
+        const commentsQuery = query(commentsRef, orderBy("timestamp", "desc"), limit(20)); // Limit for performance
         const commentsSnapshot = await getDocs(commentsQuery);
         const comments: StoryCommentData[] = commentsSnapshot.docs.map(docSnap => {
              const data = docSnap.data();
              const timestamp = data.timestamp;
-              let commentDate: Date;
+              let commentDate: Date = new Date(); // Default to now if timestamp missing/invalid
               if (timestamp instanceof Timestamp) {
                   commentDate = timestamp.toDate();
               } else if (typeof timestamp === 'string') {
-                   try {
-                      commentDate = new Date(timestamp);
-                    } catch {
-                      commentDate = new Date(); // Fallback
-                    }
-              } else {
-                  commentDate = new Date(); // Fallback
+                   try { commentDate = new Date(timestamp); } catch { /* ignore */ }
               }
              return {
                  id: docSnap.id,
-                 userId: data.userId,
+                 userId: data.userId || 'unknown',
                  userName: data.userName || 'Anonymous',
                  userAvatar: data.userAvatar,
-                 text: data.text,
+                 text: data.text || '', // Default empty string
                  timestamp: commentDate, // Ensure it's a Date object
              };
         });
          console.log(`Found ${comments.length} comments for story ${storyId}`);
 
-         // Fetch user-specific data (rating, library status) if userId is provided
+         // 5. Fetch user-specific data (rating, library status) if userId is provided
          let userRating = 0;
          let isInLibrary = false;
          if (userId) {
              try {
+                // Rating specific to the STORY
                 const ratingRef = doc(db, "stories", storyId, "ratings", userId);
                 const ratingSnap = await getDoc(ratingRef);
                 if (ratingSnap.exists()) {
-                    userRating = ratingSnap.data().rating || 0;
+                    userRating = ratingSnap.data()?.rating || 0; // Safely access rating
                 }
              } catch (ratingError) {
-                 console.error(`Error fetching rating for user ${userId} on story ${storyId}:`, ratingError);
+                 console.error(`Error fetching story rating for user ${userId} on story ${storyId}:`, ratingError);
              }
 
              try {
+                // Library status
                 const libraryRef = doc(db, "users", userId, "library", storyId);
                 const librarySnap = await getDoc(libraryRef);
                 isInLibrary = librarySnap.exists();
@@ -206,36 +186,27 @@ export const fetchStoryDetails = async (slug: string, userId?: string | null): P
                  console.error(`Error checking library status for user ${userId} on story ${storyId}:`, libraryError);
              }
          }
-         console.log(`User specific data - rating: ${userRating}, isInLibrary: ${isInLibrary}`);
+         console.log(`User specific data for story ${storyId} - rating: ${userRating}, isInLibrary: ${isInLibrary}`);
 
 
-          const author: Author = {
-              id: storyData.authorId || 'unknown_author', // Add fallback
-              name: storyData.authorName || 'Unknown Author',
-              avatarUrl: storyData.authorAvatarUrl, // Assuming authorAvatarUrl is stored on story or fetched separately
-          };
+        // 6. Calculate average rating for the STORY
+        let averageRating: number | undefined = undefined;
+        const totalSum = storyData.totalRatingSum; // Field for sum of all STORY ratings
+        const count = storyData.ratingCount;     // Field for total number of STORY ratings
+        if (typeof totalSum === 'number' && typeof count === 'number' && count > 0) {
+            averageRating = parseFloat((totalSum / count).toFixed(1));
+        }
 
-           let averageRating: number | undefined = undefined;
-           const totalSum = storyData.totalRatingSum; // Field for sum of all ratings for the story
-           const count = storyData.ratingCount;     // Field for total number of ratings for the story
-           if (typeof totalSum === 'number' && typeof count === 'number' && count > 0) {
-               averageRating = parseFloat((totalSum / count).toFixed(1));
-           }
-
+        // 7. Format lastUpdated timestamp
         const lastUpdatedTimestamp = storyData.lastUpdated;
-        let lastUpdatedISO: string;
+        let lastUpdatedISO: string = new Date().toISOString(); // Default to now
         if (lastUpdatedTimestamp instanceof Timestamp) {
              lastUpdatedISO = lastUpdatedTimestamp.toDate().toISOString();
         } else if (typeof lastUpdatedTimestamp === 'string') {
-             try {
-                 lastUpdatedISO = new Date(lastUpdatedTimestamp).toISOString();
-             } catch {
-                 lastUpdatedISO = new Date().toISOString(); // Fallback for invalid date string
-             }
-        } else {
-             lastUpdatedISO = new Date().toISOString(); // Fallback
+             try { lastUpdatedISO = new Date(lastUpdatedTimestamp).toISOString(); } catch { /* ignore */ }
         }
 
+        // 8. Construct the result
         const result: StoryDetailsResult = {
             id: storyId,
             title: storyData.title || 'Untitled Story',
@@ -243,15 +214,15 @@ export const fetchStoryDetails = async (slug: string, userId?: string | null): P
             genre: storyData.genre || 'Uncategorized',
             tags: storyData.tags || [],
             status: storyData.status || 'Ongoing',
-            authorId: storyData.authorId || 'unknown_author',
-            authorName: storyData.authorName || 'Unknown Author',
+            authorId: storyData.authorId, // Already validated above
+            authorName: author.name, // Use fetched/fallback author name
             coverImageUrl: storyData.coverImageUrl,
             reads: storyData.reads || 0,
-            author: author,
+            author: author, // Assign the Author object
             authorFollowers: storyData.authorFollowers || 0, // Add default
-            chapters: chaptersData.length,
+            chapters: chaptersData.length, // Count fetched chapters
             chaptersData: chaptersData,
-            lastUpdated: lastUpdatedISO, // Ensure it's a string
+            lastUpdated: lastUpdatedISO, // Use formatted string
             averageRating: averageRating,
             totalRatings: count || 0, // Add default
             comments: comments,
@@ -264,10 +235,11 @@ export const fetchStoryDetails = async (slug: string, userId?: string | null): P
         return result;
 
     } catch (error) {
-        console.error(`Error fetching story details for slug "${slug}":`, error);
-        // Instead of throwing, return null to allow the page component to handle it gracefully
+        // Log the specific error and which story failed
+        console.error(`CRITICAL: Error fetching story details for slug "${slug}" (Story ID potentially ${storyId || 'unknown'}):`, error);
+        // Depending on the error, you might want to check specific types (e.g., FirestoreError)
+        // For now, return null to allow the page component to handle it gracefully
         return null;
-        // throw new Error("Failed to fetch story details."); // Re-throw if you want errors to propagate
     }
 };
 
@@ -287,8 +259,13 @@ export const submitStoryComment = async (params: SubmitStoryCommentParams): Prom
             userName: auth.currentUser.displayName || 'Anonymous',
             userAvatar: auth.currentUser.photoURL
         });
-        // Optionally update comment count (consider transactions/functions for accuracy)
-         await updateDoc(doc(db, "stories", storyId), { commentCount: increment(1) });
+
+        // Update comment count on the story using a transaction for atomicity
+         const storyRef = doc(db, "stories", storyId);
+         await runTransaction(db, async (transaction) => {
+             transaction.update(storyRef, { commentCount: increment(1) });
+         });
+
         return { id: newCommentRef.id };
     } catch (error) {
         console.error("Error submitting story comment:", error);
@@ -306,38 +283,38 @@ export const submitStoryRating = async (params: SubmitStoryRatingParams): Promis
          console.error(`submitStoryRating failed: Invalid rating value ${rating}.`);
          throw new Error("Rating must be between 1 and 5.");
      }
+
+    const ratingRef = doc(db, "stories", storyId, "ratings", userId);
+    const storyRef = doc(db, "stories", storyId);
+
     try {
-        const ratingRef = doc(db, "stories", storyId, "ratings", userId);
-        const ratingSnap = await getDoc(ratingRef);
-        const previousRating = ratingSnap.exists() ? ratingSnap.data().rating : 0;
+        await runTransaction(db, async (transaction) => {
+            const ratingSnap = await transaction.get(ratingRef);
+            const storySnap = await transaction.get(storyRef);
 
-        await setDoc(ratingRef, {
-            rating: rating,
-            timestamp: serverTimestamp(),
-        });
+            if (!storySnap.exists()) {
+                throw new Error("Story does not exist!");
+            }
 
-        const storyRef = doc(db, "stories", storyId);
-        const ratingDiff = rating - previousRating;
-        const ratingCountChange = previousRating === 0 ? 1 : 0;
+            const previousRating = ratingSnap.exists() ? ratingSnap.data()?.rating || 0 : 0;
+            const currentTotalSum = storySnap.data()?.totalRatingSum || 0;
+            const currentRatingCount = storySnap.data()?.ratingCount || 0;
 
-        // This should ideally be done in a transaction or Cloud Function for better scalability
-        // Firestore transactions or Cloud Functions are recommended for atomicity.
-        // For now, attempt optimistic update (can lead to slight inaccuracies under high concurrency)
-        const storyDocSnap = await getDoc(storyRef);
-        if (storyDocSnap.exists()) {
-            const currentTotalSum = storyDocSnap.data().totalRatingSum || 0;
-            const currentRatingCount = storyDocSnap.data().ratingCount || 0;
-            await updateDoc(storyRef, {
-                totalRatingSum: increment(ratingDiff), // Use increment for atomic update
-                ratingCount: increment(ratingCountChange) // Use increment for atomic update
+            const ratingDiff = rating - previousRating;
+            const ratingCountChange = previousRating === 0 ? 1 : 0; // Only increment count if it's a new rating
+
+            // Update user's specific rating
+            transaction.set(ratingRef, {
+                rating: rating,
+                timestamp: serverTimestamp(),
             });
-        } else {
-             // Initialize if not present - less likely for an existing story being rated
-             await setDoc(storyRef, {
-                 totalRatingSum: rating,
-                 ratingCount: 1
-             }, { merge: true });
-        }
+
+            // Update aggregated rating on the story document
+            transaction.update(storyRef, {
+                totalRatingSum: currentTotalSum + ratingDiff,
+                ratingCount: currentRatingCount + ratingCountChange
+            });
+        });
 
     } catch (error) {
         console.error("Error submitting story rating:", error);
@@ -356,18 +333,22 @@ export const toggleLibraryStatus = async (userId: string, storyId: string, addTo
             // Fetch minimal story info to store in library for quick access
             const storyRef = doc(db, "stories", storyId);
             const storySnap = await getDoc(storyRef);
-            let storyInfo = {};
+            let storyInfo: Partial<Story> = {}; // Use Partial<Story> for flexibility
             if (storySnap.exists()) {
                 const data = storySnap.data();
                 storyInfo = {
-                    title: data.title || 'Untitled',
-                    coverImageUrl: data.coverImageUrl,
-                    authorName: data.authorName || 'Unknown',
-                    slug: data.slug || storyId
+                    title: data?.title || 'Untitled', // Add safe access
+                    coverImageUrl: data?.coverImageUrl,
+                    authorName: data?.authorName || 'Unknown',
+                    slug: data?.slug || storyId // Add safe access
                 };
+            } else {
+                console.warn(`Story ${storyId} not found when adding to library for user ${userId}.`);
+                // Decide if you still want to add a reference even if story details are missing
+                storyInfo = { title: 'Story not found' };
             }
             await setDoc(libraryDocRef, {
-                ...storyInfo, // Store some denormalized story data
+                ...storyInfo, // Store denormalized story data
                 addedAt: serverTimestamp(),
             });
         } else {

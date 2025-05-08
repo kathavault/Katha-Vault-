@@ -8,16 +8,16 @@ export interface Comment {
   userName: string;
   userAvatar?: string | null;
   text: string;
-  timestamp: Date | Timestamp; // Allow both for flexibility
+  timestamp: Date | Timestamp | string; // Allow ISO string for flexibility after fetch
 }
 
 // Explicitly define and export StoryCommentData if it's different or used widely
-export interface StoryCommentData extends Comment {
-  // Add any story-specific comment fields if necessary
+export interface StoryCommentData extends Omit<Comment, 'timestamp'> {
+  timestamp: Date; // Ensure timestamp is a Date object after processing
 }
 
 
-// Represents a single chapter of a story
+// Represents a single chapter of a story (as stored in DB)
 export interface Chapter {
   id: string; // Firestore document ID
   title: string;
@@ -30,23 +30,21 @@ export interface Chapter {
   totalRatingSum?: number; // Sum of ratings specifically for THIS chapter
   ratingCount?: number;    // Count of ratings specifically for THIS chapter
   commentCount?: number;   // Count of comments specifically for THIS chapter
-  // comments?: Comment[]; // Comments specific to this chapter (usually fetched separately for read view)
 }
 
-// Represents the main story object
+// Represents the main story object (as stored in DB)
 export interface Story {
   id: string; // Firestore document ID
   title: string;
   description: string;
   genre: string;
-  tags?: string[]; // Make tags optional if they might not exist
-  status?: 'Draft' | 'Published' | 'Archived' | 'Ongoing' | 'Completed'; // Make status optional with default
+  tags?: string[];
+  status: 'Draft' | 'Published' | 'Archived' | 'Ongoing' | 'Completed'; // Added Ongoing/Completed
   authorId: string; // Firestore user ID of the author
-  authorName?: string; // Author's display name (make optional)
+  authorName: string; // Author's display name
   authorAvatarUrl?: string; // Optional author avatar URL (denormalized)
   coverImageUrl?: string;
-  chapters?: Chapter[]; // Usually IDs/basic info if not fully embedded. For detail page, full chapter summaries fetched.
-  chapterCount?: number; // Explicit count of chapters, often from story.chaptersData.length
+  chapterCount?: number; // Explicit count of chapters
   reads?: number; // Read count
   lastUpdated?: Date | Timestamp | string; // Firestore Timestamp or ISO string/Date object
   slug: string; // URL-friendly identifier
@@ -55,18 +53,14 @@ export interface Story {
   // Story-level aggregated data (make optional as they might not exist initially)
   totalRatingSum?: number;  // Sum of all ratings for THE STORY
   ratingCount?: number;     // Total number of ratings for THE STORY
-  averageRating?: number;   // Calculated: totalRatingSum / ratingCount for THE STORY
-
   commentCount?: number;    // Total number of comments for THE STORY
-  // comments?: Comment[];  // Story-level comments, if fetched and displayed directly on story page
-                           // Often fetched paginated or limited set
 }
 
 // Represents basic user profile information stored in Firestore
 export interface UserProfile {
-    id: string; // Same as Firebase Auth UID
+    id?: string; // Might not be directly on the doc data, but the doc ID
     name?: string | null;
-    email: string | null; // Should match auth email
+    email?: string | null; // Should match auth email
     avatarUrl?: string | null;
     bio?: string;
     isAdmin?: boolean; // Indicates admin role
@@ -96,3 +90,76 @@ export interface SiteSettings {
 }
 
 
+// --- Types for Service Function Results ---
+
+// Type for Author details (used in StoryDetailsResult)
+export interface Author {
+    id: string;
+    name: string;
+    avatarUrl?: string;
+}
+
+// Type for Chapter summary (used in StoryDetailsResult)
+export interface ChapterSummary {
+    id: string;
+    title: string;
+    order: number;
+    wordCount?: number;
+    lastUpdated?: string; // ISO string or undefined
+}
+
+// Type for the result returned by fetchStoryDetails
+export interface StoryDetailsResult extends Omit<Story, 'id' | 'authorId' | 'authorName' | 'authorAvatarUrl' | 'lastUpdated'> {
+    id: string; // Ensure id is present
+    author: Author; // Use the Author interface
+    chaptersData: ChapterSummary[];
+    authorFollowers: number; // Example additional data
+    lastUpdated: string; // Ensure lastUpdated is always a string (ISO format)
+    averageRating?: number; // Calculated average rating for the story
+    totalRatings?: number; // Total number of ratings for the story
+    comments?: StoryCommentData[]; // Processed comments with Date objects
+    userRating?: number; // User's rating for the story (0 if not rated)
+    isInLibrary?: boolean; // Whether the story is in the user's library
+}
+
+// Type for the result returned by fetchChapterDetails
+export interface ChapterDetailsResult {
+    title: string;
+    content: string;
+    storyTitle: string;
+    storyAuthor: string;
+    totalChapters: number;
+    storyId: string;
+    chapterId: string;
+    comments?: StoryCommentData[]; // Processed comments with Date objects
+    userRating?: number; // User's rating for this specific chapter (0 if not rated)
+}
+
+
+// --- Types for Service Function Parameters ---
+
+export interface SubmitCommentParams {
+    storyId: string;
+    chapterId: string; // Chapter ID is needed for chapter comments
+    userId: string;
+    text: string;
+}
+
+export interface SubmitRatingParams {
+    storyId: string;
+    chapterId: string; // Chapter ID is needed for chapter ratings
+    userId: string;
+    rating: number; // Should be 1-5
+}
+
+export interface SubmitStoryCommentParams {
+    storyId: string;
+    userId: string;
+    text: string;
+}
+
+export interface SubmitStoryRatingParams {
+    storyId: string;
+    userId: string;
+    rating: number;
+}

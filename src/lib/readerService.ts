@@ -14,51 +14,10 @@ import {
     setDoc,
     Timestamp,
     updateDoc,
-    increment
+    increment,
+    runTransaction // Added for atomic updates
 } from 'firebase/firestore';
-import type { Chapter } from '@/types';
-
-// Define types for service functions
-interface ChapterDetailsParams {
-    slug: string;
-    chapterNumber: number;
-    userId?: string | null; // Optional user ID to check for existing ratings/comments
-}
-
-interface SubmitCommentParams {
-    storyId: string;
-    chapterId: string;
-    userId: string;
-    text: string;
-}
-
-interface SubmitRatingParams {
-    storyId: string;
-    chapterId: string;
-    userId: string;
-    rating: number; // Should be 1-5
-}
-
-interface CommentData {
-    id: string;
-    userId: string;
-    userName: string;
-    userAvatar?: string | null;
-    text: string;
-    timestamp: Date;
-}
-
-interface ChapterDetailsResult {
-    title: string;
-    content: string;
-    storyTitle: string;
-    storyAuthor: string;
-    totalChapters: number;
-    storyId: string;
-    chapterId: string;
-    comments?: CommentData[];
-    userRating?: number; // User's rating for this specific chapter
-}
+import type { Chapter, StoryCommentData, ChapterDetailsResult, SubmitCommentParams, SubmitRatingParams } from '@/types'; // Import necessary types
 
 /**
  * Fetches detailed information for a specific chapter, including comments.
@@ -69,6 +28,9 @@ export const fetchChapterDetails = async (slug: string, chapterNumber: number, u
         return null;
     }
     console.log(`Fetching chapter details for slug: ${slug}, chapter: ${chapterNumber}, userId: ${userId}`);
+
+    let storyId = '';
+    let chapterId = '';
 
     try {
         // 1. Find the story by slug
@@ -82,7 +44,7 @@ export const fetchChapterDetails = async (slug: string, chapterNumber: number, u
         }
         const storyDoc = storySnapshot.docs[0];
         const storyData = storyDoc.data();
-        const storyId = storyDoc.id;
+        storyId = storyDoc.id;
          console.log(`Found story with ID: ${storyId}`);
 
         // 2. Find the specific chapter by order/number within the story's subcollection
@@ -96,22 +58,35 @@ export const fetchChapterDetails = async (slug: string, chapterNumber: number, u
         }
         const chapterDoc = chapterSnapshot.docs[0];
         const chapterData = chapterDoc.data() as Omit<Chapter, 'id'>;
-        const chapterId = chapterDoc.id;
+        chapterId = chapterDoc.id; // Assign chapterId
          console.log(`Found chapter with ID: ${chapterId}`);
+
+         // Validate essential chapter/story data
+         if (!chapterData || !storyData) {
+             console.error(`Incomplete chapter or story data for story ${storyId}, chapter ${chapterId}`);
+             return null;
+         }
 
         // 3. Fetch comments for this chapter (e.g., last 20)
         const commentsRef = collection(db, "stories", storyId, "chapters", chapterId, "comments");
         const commentsQuery = query(commentsRef, orderBy("timestamp", "desc"), limit(20));
         const commentsSnapshot = await getDocs(commentsQuery);
-        const comments: CommentData[] = commentsSnapshot.docs.map(docSnap => {
+        const comments: StoryCommentData[] = commentsSnapshot.docs.map(docSnap => {
              const data = docSnap.data();
+             const timestamp = data.timestamp;
+             let commentDate: Date = new Date(); // Default to now
+             if (timestamp instanceof Timestamp) {
+                 commentDate = timestamp.toDate();
+             } else if (typeof timestamp === 'string') {
+                 try { commentDate = new Date(timestamp); } catch { /* ignore invalid date */ }
+             }
              return {
                  id: docSnap.id,
-                 userId: data.userId,
+                 userId: data.userId || 'unknown',
                  userName: data.userName || 'Anonymous', // Handle missing names
                  userAvatar: data.userAvatar,
-                 text: data.text,
-                 timestamp: (data.timestamp as Timestamp)?.toDate() || new Date(), // Convert Firestore Timestamp
+                 text: data.text || '', // Handle missing text
+                 timestamp: commentDate, // Convert Firestore Timestamp
              };
         });
         console.log(`Found ${comments.length} comments for chapter ${chapterId}`);
@@ -121,16 +96,18 @@ export const fetchChapterDetails = async (slug: string, chapterNumber: number, u
         let userRating = 0;
         if (userId) {
              try {
+                 // Path: /stories/{storyId}/chapters/{chapterId}/ratings/{userId}
                 const ratingRef = doc(db, "stories", storyId, "chapters", chapterId, "ratings", userId);
                 const ratingSnap = await getDoc(ratingRef);
                 if (ratingSnap.exists()) {
-                    userRating = ratingSnap.data().rating || 0;
+                    userRating = ratingSnap.data()?.rating || 0; // Safe access
                 }
              } catch (ratingError) {
                  console.error(`Error fetching rating for user ${userId} on chapter ${chapterId}:`, ratingError);
+                 // Don't fail the whole fetch, just proceed without user rating
              }
         }
-        console.log(`User specific data - rating: ${userRating}`);
+        console.log(`User specific data for chapter ${chapterId} - rating: ${userRating}`);
 
 
         // 5. Construct the result
@@ -139,7 +116,7 @@ export const fetchChapterDetails = async (slug: string, chapterNumber: number, u
             content: chapterData.content || 'Content not available.', // Fallback content
             storyTitle: storyData.title || 'Untitled Story',
             storyAuthor: storyData.authorName || 'Unknown Author', // Assuming authorName is stored
-            totalChapters: storyData.chapters || 0, // Assuming chapter count is stored or calculate if needed
+            totalChapters: storyData.chapterCount || 0, // Use stored chapterCount if available
             storyId: storyId,
             chapterId: chapterId,
             comments: comments,
@@ -149,10 +126,9 @@ export const fetchChapterDetails = async (slug: string, chapterNumber: number, u
         return result;
 
     } catch (error) {
-        console.error(`Error fetching chapter details for slug "${slug}", chapter ${chapterNumber}:`, error);
+        console.error(`CRITICAL: Error fetching chapter details for slug "${slug}", chapter ${chapterNumber} (StoryID: ${storyId}, ChapterID: ${chapterId}):`, error);
         // Return null instead of throwing to allow page to handle gracefully
         return null;
-        // throw new Error("Failed to fetch chapter details."); // Re-throw if you prefer build failure
     }
 };
 
@@ -168,23 +144,43 @@ export const submitComment = async (params: SubmitCommentParams): Promise<{ id: 
         throw new Error("User is not authenticated or UID mismatch.");
     }
 
+    const commentData = {
+        userId: userId,
+        text: text,
+        timestamp: serverTimestamp(), // Use server timestamp
+        // Store denormalized user info for easier display (optional but recommended)
+        userName: auth.currentUser.displayName || 'Anonymous',
+        userAvatar: auth.currentUser.photoURL
+    };
+
+    const commentRef = collection(db, "stories", storyId, "chapters", chapterId, "comments");
+    const chapterRef = doc(db, "stories", storyId, "chapters", chapterId);
+    const storyRef = doc(db, "stories", storyId); // Reference to the main story doc
+
     try {
-        const commentsRef = collection(db, "stories", storyId, "chapters", chapterId, "comments");
-        const newCommentRef = await addDoc(commentsRef, {
-            userId: userId,
-            text: text,
-            timestamp: serverTimestamp(), // Use server timestamp
-            // Store denormalized user info for easier display (optional but recommended)
-            userName: auth.currentUser.displayName || 'Anonymous',
-            userAvatar: auth.currentUser.photoURL
+        // Use a transaction to add comment and increment counts atomically
+        const newCommentDocRef = await runTransaction(db, async (transaction) => {
+             // 1. Add the new comment document
+             const addedDocRef = await addDoc(commentRef, commentData); // Add doc needs to happen outside transaction to get ref, or generate ID beforehand
+
+             // If addDoc were inside, we couldn't get the ID easily.
+             // Alternative: Generate ID beforehand `const newId = doc(commentRef).id; transaction.set(doc(commentRef, newId), ...)`
+
+             // 2. Increment comment count on the chapter
+             transaction.update(chapterRef, { commentCount: increment(1) });
+
+             // 3. Increment comment count on the story
+             transaction.update(storyRef, { commentCount: increment(1) });
+
+             return addedDocRef; // Or return the generated ID if done differently
         });
-         // Optionally, update a comment count on the chapter/story document (use transactions for accuracy)
-         // await updateDoc(doc(db, "stories", storyId, "chapters", chapterId), { commentCount: increment(1) });
 
 
-        return { id: newCommentRef.id };
+        // Return the ID of the newly created comment
+         return { id: newCommentDocRef.id }; // Assuming addDoc was outside transaction or ID was pre-generated
+
     } catch (error) {
-        console.error("Error submitting comment:", error);
+        console.error("Error submitting comment with transaction:", error);
         throw new Error("Failed to submit comment.");
     }
 };
@@ -204,35 +200,41 @@ export const submitRating = async (params: SubmitRatingParams): Promise<void> =>
          throw new Error("Rating must be between 1 and 5.");
      }
 
-    try {
-        const ratingRef = doc(db, "stories", storyId, "chapters", chapterId, "ratings", userId);
-        // Check if rating already exists to calculate diff for average later
-        const ratingSnap = await getDoc(ratingRef);
-        const previousRating = ratingSnap.exists() ? ratingSnap.data().rating : 0;
+    const ratingRef = doc(db, "stories", storyId, "chapters", chapterId, "ratings", userId);
+    const chapterRef = doc(db, "stories", storyId, "chapters", chapterId);
 
-        // Set/update the user's specific rating
-        await setDoc(ratingRef, {
-            rating: rating,
-            timestamp: serverTimestamp(),
+    try {
+        await runTransaction(db, async (transaction) => {
+            const ratingSnap = await transaction.get(ratingRef);
+            const chapterSnap = await transaction.get(chapterRef);
+
+            if (!chapterSnap.exists()) {
+                throw new Error("Chapter does not exist!");
+            }
+
+            const previousRating = ratingSnap.exists() ? ratingSnap.data()?.rating || 0 : 0;
+            const currentTotalSum = chapterSnap.data()?.totalRatingSum || 0;
+            const currentRatingCount = chapterSnap.data()?.ratingCount || 0;
+
+            const ratingDiff = rating - previousRating;
+            const ratingCountChange = previousRating === 0 ? 1 : 0; // Increment count only if it's a new rating
+
+            // Update user's specific rating
+            transaction.set(ratingRef, {
+                rating: rating,
+                timestamp: serverTimestamp(),
+            });
+
+            // Update aggregated rating on the chapter document
+            transaction.update(chapterRef, {
+                totalRatingSum: currentTotalSum + ratingDiff,
+                ratingCount: currentRatingCount + ratingCountChange
+                // Average can be calculated on read: totalRatingSum / ratingCount
+            });
         });
 
-        // Update aggregated rating on the chapter document (requires a transaction for accuracy)
-        // This part is complex and might involve Cloud Functions for better scalability
-        // Simple (less accurate) update example:
-        const chapterRef = doc(db, "stories", storyId, "chapters", chapterId);
-        const ratingDiff = rating - previousRating;
-        const ratingCountChange = previousRating === 0 ? 1 : 0; // Increment count only if it's a new rating
-
-        // Use transaction or cloud function for atomic update in production
-         await updateDoc(chapterRef, {
-             totalRatingSum: increment(ratingDiff), // Field to store sum of all ratings
-             ratingCount: increment(ratingCountChange) // Field to store number of ratings
-             // Average can be calculated on read: totalRatingSum / ratingCount
-         });
-
-
     } catch (error) {
-        console.error("Error submitting rating:", error);
-        throw new Error("Failed to submit rating.");
+        console.error("Error submitting chapter rating:", error);
+        throw new Error("Failed to submit chapter rating.");
     }
 };
