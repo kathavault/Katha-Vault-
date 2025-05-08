@@ -64,6 +64,12 @@ interface ChapterDetailsResult {
  * Fetches detailed information for a specific chapter, including comments.
  */
 export const fetchChapterDetails = async (slug: string, chapterNumber: number, userId?: string | null): Promise<ChapterDetailsResult | null> => {
+    if (!slug || isNaN(chapterNumber) || chapterNumber < 1) {
+        console.error(`fetchChapterDetails called with invalid parameters: slug=${slug}, chapterNumber=${chapterNumber}`);
+        return null;
+    }
+    console.log(`Fetching chapter details for slug: ${slug}, chapter: ${chapterNumber}, userId: ${userId}`);
+
     try {
         // 1. Find the story by slug
         const storiesRef = collection(db, "stories");
@@ -77,6 +83,7 @@ export const fetchChapterDetails = async (slug: string, chapterNumber: number, u
         const storyDoc = storySnapshot.docs[0];
         const storyData = storyDoc.data();
         const storyId = storyDoc.id;
+         console.log(`Found story with ID: ${storyId}`);
 
         // 2. Find the specific chapter by order/number within the story's subcollection
         const chaptersRef = collection(db, "stories", storyId, "chapters");
@@ -84,12 +91,13 @@ export const fetchChapterDetails = async (slug: string, chapterNumber: number, u
         const chapterSnapshot = await getDocs(chapterQuery);
 
         if (chapterSnapshot.empty) {
-            console.warn(`Chapter number ${chapterNumber} for story "${slug}" not found.`);
+            console.warn(`Chapter number ${chapterNumber} for story "${slug}" (ID: ${storyId}) not found.`);
             return null;
         }
         const chapterDoc = chapterSnapshot.docs[0];
-        const chapterData = chapterDoc.data() as Omit<Chapter, 'id'>; // Fixed Omit syntax
+        const chapterData = chapterDoc.data() as Omit<Chapter, 'id'>;
         const chapterId = chapterDoc.id;
+         console.log(`Found chapter with ID: ${chapterId}`);
 
         // 3. Fetch comments for this chapter (e.g., last 20)
         const commentsRef = collection(db, "stories", storyId, "chapters", chapterId, "comments");
@@ -100,29 +108,37 @@ export const fetchChapterDetails = async (slug: string, chapterNumber: number, u
              return {
                  id: docSnap.id,
                  userId: data.userId,
-                 userName: data.userName, // Fetch user name (ideally stored with comment or fetched separately)
-                 userAvatar: data.userAvatar, // Fetch avatar URL
+                 userName: data.userName || 'Anonymous', // Handle missing names
+                 userAvatar: data.userAvatar,
                  text: data.text,
                  timestamp: (data.timestamp as Timestamp)?.toDate() || new Date(), // Convert Firestore Timestamp
              };
         });
+        console.log(`Found ${comments.length} comments for chapter ${chapterId}`);
+
 
         // 4. Fetch user's rating for this chapter (if userId provided)
         let userRating = 0;
         if (userId) {
-            const ratingRef = doc(db, "stories", storyId, "chapters", chapterId, "ratings", userId);
-            const ratingSnap = await getDoc(ratingRef);
-            if (ratingSnap.exists()) {
-                userRating = ratingSnap.data().rating || 0;
-            }
+             try {
+                const ratingRef = doc(db, "stories", storyId, "chapters", chapterId, "ratings", userId);
+                const ratingSnap = await getDoc(ratingRef);
+                if (ratingSnap.exists()) {
+                    userRating = ratingSnap.data().rating || 0;
+                }
+             } catch (ratingError) {
+                 console.error(`Error fetching rating for user ${userId} on chapter ${chapterId}:`, ratingError);
+             }
         }
+        console.log(`User specific data - rating: ${userRating}`);
+
 
         // 5. Construct the result
         const result: ChapterDetailsResult = {
-            title: chapterData.title,
-            content: chapterData.content,
-            storyTitle: storyData.title,
-            storyAuthor: storyData.authorName, // Assuming authorName is stored
+            title: chapterData.title || `Chapter ${chapterNumber}`, // Fallback title
+            content: chapterData.content || 'Content not available.', // Fallback content
+            storyTitle: storyData.title || 'Untitled Story',
+            storyAuthor: storyData.authorName || 'Unknown Author', // Assuming authorName is stored
             totalChapters: storyData.chapters || 0, // Assuming chapter count is stored or calculate if needed
             storyId: storyId,
             chapterId: chapterId,
@@ -133,8 +149,10 @@ export const fetchChapterDetails = async (slug: string, chapterNumber: number, u
         return result;
 
     } catch (error) {
-        console.error("Error fetching chapter details:", error);
-        throw new Error("Failed to fetch chapter details.");
+        console.error(`Error fetching chapter details for slug "${slug}", chapter ${chapterNumber}:`, error);
+        // Return null instead of throwing to allow page to handle gracefully
+        return null;
+        // throw new Error("Failed to fetch chapter details."); // Re-throw if you prefer build failure
     }
 };
 
@@ -146,6 +164,7 @@ export const submitComment = async (params: SubmitCommentParams): Promise<{ id: 
     const { storyId, chapterId, userId, text } = params;
 
     if (!auth.currentUser || auth.currentUser.uid !== userId) {
+         console.error("submitComment failed: User not authenticated or UID mismatch.");
         throw new Error("User is not authenticated or UID mismatch.");
     }
 
@@ -160,6 +179,8 @@ export const submitComment = async (params: SubmitCommentParams): Promise<{ id: 
             userAvatar: auth.currentUser.photoURL
         });
          // Optionally, update a comment count on the chapter/story document (use transactions for accuracy)
+         // await updateDoc(doc(db, "stories", storyId, "chapters", chapterId), { commentCount: increment(1) });
+
 
         return { id: newCommentRef.id };
     } catch (error) {
@@ -175,9 +196,11 @@ export const submitRating = async (params: SubmitRatingParams): Promise<void> =>
     const { storyId, chapterId, userId, rating } = params;
 
      if (!auth.currentUser || auth.currentUser.uid !== userId) {
+         console.error("submitRating failed: User not authenticated or UID mismatch.");
         throw new Error("User is not authenticated or UID mismatch.");
      }
      if (rating < 1 || rating > 5) {
+         console.error(`submitRating failed: Invalid rating value ${rating}.`);
          throw new Error("Rating must be between 1 and 5.");
      }
 
@@ -200,11 +223,12 @@ export const submitRating = async (params: SubmitRatingParams): Promise<void> =>
         const ratingDiff = rating - previousRating;
         const ratingCountChange = previousRating === 0 ? 1 : 0; // Increment count only if it's a new rating
 
-        await updateDoc(chapterRef, {
-            totalRatingSum: increment(ratingDiff), // Field to store sum of all ratings
-            ratingCount: increment(ratingCountChange) // Field to store number of ratings
-            // Average can be calculated on read: totalRatingSum / ratingCount
-        });
+        // Use transaction or cloud function for atomic update in production
+         await updateDoc(chapterRef, {
+             totalRatingSum: increment(ratingDiff), // Field to store sum of all ratings
+             ratingCount: increment(ratingCountChange) // Field to store number of ratings
+             // Average can be calculated on read: totalRatingSum / ratingCount
+         });
 
 
     } catch (error) {

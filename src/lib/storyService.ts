@@ -85,9 +85,39 @@ interface SubmitStoryRatingParams {
 }
 
 /**
+ * Fetches basic data (including slugs) for all stories.
+ * Used primarily for generateStaticParams.
+ */
+export const getStories = async (): Promise<Pick<Story, 'id' | 'slug'>[]> => {
+    const storiesRef = collection(db, "stories");
+    // Potentially filter by status === 'Published' if only published stories should be pre-rendered
+    // const q = query(storiesRef, where("status", "==", "Published"));
+    const q = query(storiesRef); // Fetch all for now
+    try {
+        const querySnapshot = await getDocs(q);
+        return querySnapshot.docs.map(doc => ({
+            id: doc.id,
+            slug: doc.data().slug || doc.id // Fallback to ID if slug missing
+        }));
+    } catch (error) {
+        console.error("Error fetching stories for generateStaticParams:", error);
+        // Return empty array on error during build to avoid breaking static generation entirely
+        // Or re-throw if you want the build to fail
+        return [];
+    }
+};
+
+
+/**
  * Fetches detailed information for a specific story by its slug.
  */
 export const fetchStoryDetails = async (slug: string, userId?: string | null): Promise<StoryDetailsResult | null> => {
+    if (!slug) {
+        console.error("fetchStoryDetails called with empty or null slug.");
+        return null;
+    }
+    console.log(`Fetching story details for slug: ${slug}, userId: ${userId}`);
+
     try {
         const storiesRef = collection(db, "stories");
         const storyQuery = query(storiesRef, where("slug", "==", slug), limit(1));
@@ -100,7 +130,9 @@ export const fetchStoryDetails = async (slug: string, userId?: string | null): P
         const storyDoc = storySnapshot.docs[0];
         const storyData = storyDoc.data();
         const storyId = storyDoc.id;
+        console.log(`Found story with ID: ${storyId}`);
 
+        // Fetch chapters
         const chaptersRef = collection(db, "stories", storyId, "chapters");
         const chaptersQuery = query(chaptersRef, orderBy("order", "asc"));
         const chaptersSnapshot = await getDocs(chaptersQuery);
@@ -114,7 +146,9 @@ export const fetchStoryDetails = async (slug: string, userId?: string | null): P
                 lastUpdated: chData.lastUpdated instanceof Timestamp ? chData.lastUpdated.toDate().toISOString() : (chData.lastUpdated || new Date().toISOString())
             };
         });
+        console.log(`Found ${chaptersData.length} chapters for story ${storyId}`);
 
+        // Fetch comments
         const commentsRef = collection(db, "stories", storyId, "comments");
         const commentsQuery = query(commentsRef, orderBy("timestamp", "desc"), limit(20));
         const commentsSnapshot = await getDocs(commentsQuery);
@@ -126,25 +160,35 @@ export const fetchStoryDetails = async (slug: string, userId?: string | null): P
                  userName: data.userName || 'Anonymous',
                  userAvatar: data.userAvatar,
                  text: data.text,
-                 timestamp: (data.timestamp instanceof Timestamp)?.toDate() || new Date(),
+                 timestamp: (data.timestamp instanceof Timestamp) ? data.timestamp.toDate() : new Date(),
              };
         });
+         console.log(`Found ${comments.length} comments for story ${storyId}`);
 
+         // Fetch user-specific data (rating, library status) if userId is provided
          let userRating = 0;
+         let isInLibrary = false;
          if (userId) {
-             const ratingRef = doc(db, "stories", storyId, "ratings", userId);
-             const ratingSnap = await getDoc(ratingRef);
-             if (ratingSnap.exists()) {
-                 userRating = ratingSnap.data().rating || 0;
+             try {
+                const ratingRef = doc(db, "stories", storyId, "ratings", userId);
+                const ratingSnap = await getDoc(ratingRef);
+                if (ratingSnap.exists()) {
+                    userRating = ratingSnap.data().rating || 0;
+                }
+             } catch (ratingError) {
+                 console.error(`Error fetching rating for user ${userId} on story ${storyId}:`, ratingError);
+             }
+
+             try {
+                const libraryRef = doc(db, "users", userId, "library", storyId);
+                const librarySnap = await getDoc(libraryRef);
+                isInLibrary = librarySnap.exists();
+             } catch (libraryError) {
+                 console.error(`Error checking library status for user ${userId} on story ${storyId}:`, libraryError);
              }
          }
+         console.log(`User specific data - rating: ${userRating}, isInLibrary: ${isInLibrary}`);
 
-          let isInLibrary = false;
-          if (userId) {
-              const libraryRef = doc(db, "users", userId, "library", storyId);
-              const librarySnap = await getDoc(libraryRef);
-              isInLibrary = librarySnap.exists();
-          }
 
           const author: Author = {
               id: storyData.authorId,
@@ -159,38 +203,48 @@ export const fetchStoryDetails = async (slug: string, userId?: string | null): P
                averageRating = parseFloat((totalSum / count).toFixed(1));
            }
 
-
+        const lastUpdatedTimestamp = storyData.lastUpdated;
+        let lastUpdatedISO: string;
+        if (lastUpdatedTimestamp instanceof Timestamp) {
+             lastUpdatedISO = lastUpdatedTimestamp.toDate().toISOString();
+        } else if (typeof lastUpdatedTimestamp === 'string') {
+             lastUpdatedISO = new Date(lastUpdatedTimestamp).toISOString();
+        } else {
+             lastUpdatedISO = new Date().toISOString(); // Fallback
+        }
 
         const result: StoryDetailsResult = {
             id: storyId,
-            title: storyData.title,
-            description: storyData.description,
-            genre: storyData.genre,
+            title: storyData.title || 'Untitled Story',
+            description: storyData.description || 'No description available.',
+            genre: storyData.genre || 'Uncategorized',
             tags: storyData.tags || [],
             status: storyData.status || 'Ongoing',
-            authorId: storyData.authorId,
-            authorName: storyData.authorName,
+            authorId: storyData.authorId || 'unknown_author',
+            authorName: storyData.authorName || 'Unknown Author',
             coverImageUrl: storyData.coverImageUrl,
             reads: storyData.reads || 0,
             author: author,
-            authorFollowers: storyData.authorFollowers || 0, // Placeholder, might need separate fetch for author profile
+            authorFollowers: storyData.authorFollowers || 0,
             chapters: chaptersData.length,
             chaptersData: chaptersData,
-            lastUpdated: (storyData.lastUpdated instanceof Timestamp ? storyData.lastUpdated.toDate() : new Date(storyData.lastUpdated || Date.now())).toISOString(),
+            lastUpdated: lastUpdatedISO,
             averageRating: averageRating,
             totalRatings: count || 0,
             comments: comments,
             userRating: userRating,
             isInLibrary: isInLibrary,
-            slug: storyData.slug,
+            slug: storyData.slug || storyId, // Fallback to ID if slug missing
             dataAiHint: storyData.dataAiHint,
         };
 
         return result;
 
     } catch (error) {
-        console.error("Error fetching story details:", error);
-        throw new Error("Failed to fetch story details.");
+        console.error(`Error fetching story details for slug "${slug}":`, error);
+        // Instead of throwing, return null to allow the page component to handle it gracefully
+        return null;
+        // throw new Error("Failed to fetch story details."); // Re-throw if you want errors to propagate
     }
 };
 
@@ -198,6 +252,7 @@ export const fetchStoryDetails = async (slug: string, userId?: string | null): P
 export const submitStoryComment = async (params: SubmitStoryCommentParams): Promise<{ id: string }> => {
     const { storyId, userId, text } = params;
     if (!auth.currentUser || auth.currentUser.uid !== userId) {
+        console.error("submitStoryComment failed: User not authenticated or UID mismatch.");
         throw new Error("User is not authenticated or UID mismatch.");
     }
     try {
@@ -209,6 +264,7 @@ export const submitStoryComment = async (params: SubmitStoryCommentParams): Prom
             userName: auth.currentUser.displayName || 'Anonymous',
             userAvatar: auth.currentUser.photoURL
         });
+        // Optionally update comment count (consider transactions/functions for accuracy)
         // await updateDoc(doc(db, "stories", storyId), { commentCount: increment(1) });
         return { id: newCommentRef.id };
     } catch (error) {
@@ -220,9 +276,11 @@ export const submitStoryComment = async (params: SubmitStoryCommentParams): Prom
 export const submitStoryRating = async (params: SubmitStoryRatingParams): Promise<void> => {
     const { storyId, userId, rating } = params;
      if (!auth.currentUser || auth.currentUser.uid !== userId) {
+        console.error("submitStoryRating failed: User not authenticated or UID mismatch.");
         throw new Error("User is not authenticated or UID mismatch.");
      }
      if (rating < 1 || rating > 5) {
+         console.error(`submitStoryRating failed: Invalid rating value ${rating}.`);
          throw new Error("Rating must be between 1 and 5.");
      }
     try {
@@ -240,8 +298,8 @@ export const submitStoryRating = async (params: SubmitStoryRatingParams): Promis
         const ratingCountChange = previousRating === 0 ? 1 : 0;
 
         // This should ideally be done in a transaction or Cloud Function for better scalability
-        // For client-side, this is an optimistic update.
         // Firestore transactions or Cloud Functions are recommended for atomicity.
+        // For now, attempt optimistic update (can lead to slight inaccuracies under high concurrency)
         const storyDocSnap = await getDoc(storyRef);
         if (storyDocSnap.exists()) {
             const currentTotalSum = storyDocSnap.data().totalRatingSum || 0;
@@ -251,7 +309,7 @@ export const submitStoryRating = async (params: SubmitStoryRatingParams): Promis
                 ratingCount: currentRatingCount + ratingCountChange
             });
         } else {
-            // Initialize if not present - though less likely for an existing story
+             // Initialize if not present - less likely for an existing story being rated
              await setDoc(storyRef, {
                  totalRatingSum: rating,
                  ratingCount: 1
@@ -266,6 +324,7 @@ export const submitStoryRating = async (params: SubmitStoryRatingParams): Promis
 
 export const toggleLibraryStatus = async (userId: string, storyId: string, addToLibrary: boolean): Promise<void> => {
     if (!auth.currentUser || auth.currentUser.uid !== userId) {
+        console.error("toggleLibraryStatus failed: User not authenticated or UID mismatch.");
         throw new Error("User is not authenticated or UID mismatch.");
     }
     const libraryDocRef = doc(db, "users", userId, "library", storyId);
@@ -278,10 +337,10 @@ export const toggleLibraryStatus = async (userId: string, storyId: string, addTo
             if (storySnap.exists()) {
                 const data = storySnap.data();
                 storyInfo = {
-                    title: data.title,
+                    title: data.title || 'Untitled',
                     coverImageUrl: data.coverImageUrl,
-                    authorName: data.authorName,
-                    slug: data.slug
+                    authorName: data.authorName || 'Unknown',
+                    slug: data.slug || storyId
                 };
             }
             await setDoc(libraryDocRef, {

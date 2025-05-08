@@ -1,6 +1,8 @@
-// src/app/story/[slug]/page.tsx
 
+// --- Server Side ---
+import React, { useEffect, useState, Suspense, use } from 'react';
 // --- Type Definitions ---
+import { fetchStoryDetails, submitStoryComment, submitStoryRating, toggleLibraryStatus, getStories } from '@/lib/storyService'; // Added getStories
 import type { NextPage } from 'next';
 import type { Story as BaseStory } from '@/components/story/story-card';
 import type { Timestamp } from 'firebase/firestore';
@@ -59,14 +61,27 @@ interface StoryPageResolvedParams {
     slug: string;
 }
 
+interface StoryParams {
+  slug: string;
+}
+
 interface StoryPageProps {
-    params: Promise<StoryPageResolvedParams>;
+  params: StoryParams;
+}
+
+
+// Required for static export with dynamic routes
+export async function generateStaticParams() {
+    // Fetch slugs for all stories (or maybe just published ones for static export?)
+    // Note: Depending on the number of stories, this might increase build time significantly.
+    // Consider fetching only a subset or using ISR if build time becomes an issue.
+    const stories = await getStories(); // Assuming getStories fetches all necessary story slugs
+    return stories.map((story) => ({
+        slug: story.slug,
+    }));
 }
 
 // --- Client Component ---
-'use client';
-
-import Image from 'next/image';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -90,20 +105,19 @@ import {
     Bookmark,
     Heart,
 } from 'lucide-react';
-import React, { useEffect, useState, Suspense, use } from 'react';
+import Image from 'next/image';
 import { useAuth } from '@/hooks/use-auth';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { validateCommentData, validateRatingData } from '@/services/validationService';
-import { fetchStoryDetails, submitStoryComment, submitStoryRating, toggleLibraryStatus } from '@/lib/storyService';
+// Removed duplicate fetchStoryDetails import
 import { Skeleton } from '@/components/ui/skeleton'; // Import Skeleton
 
 
-const StoryDetailPage: NextPage<StoryPageProps> = (props) => {
+const StoryDetailPage: React.FC<{ slug: string }> = ({ slug }) => {
     // --- Hooks and State ---
-    const resolvedParams = use(props.params); // Unwrap the promise
-    const { slug } = resolvedParams;
-    const { user, isLoading: authLoading } = useAuth();
+
+    const { user, isLoading: authLoading } = useAuth(); // Removed unused authLoading
     const { toast } = useToast();
     const [story, setStory] = useState<StoryDetailsResult | null>(null);
     const [isLoading, setIsLoading] = useState(true);
@@ -116,33 +130,29 @@ const StoryDetailPage: NextPage<StoryPageProps> = (props) => {
     const [comments, setComments] = useState<StoryCommentData[]>([]);
 
     // --- Data Fetching ---
-    useEffect(() => {
+  useEffect(() => {
         const fetchStory = async () => {
-            if (!slug) return;
-            setIsLoading(true);
-            try {
-                // Pass userId if available to check library status and user rating
-                const data = await fetchStoryDetails(slug, user?.id);
-                setStory(data);
-                setRating(data?.userRating || 0);
-                setIsInLibrary(data?.isInLibrary || false);
-                setComments(data?.comments || []);
-            } catch (error) {
-                console.error("Error fetching story details:", error);
-                setStory(null);
-                toast({
-                    title: "Error Loading Story",
-                    description: "Could not load the story details. Please try again later.",
-                    variant: "destructive",
-                });
-            } finally {
-                setIsLoading(false);
-            }
+          setIsLoading(true);
+          try {
+            const data = await fetchStoryDetails(slug, user?.id);
+            setStory(data);
+            setRating(data?.userRating || 0);
+            setIsInLibrary(data?.isInLibrary || false);
+            setComments(data?.comments || []);
+          } catch (error) {
+            console.error("Error fetching story details:", error);
+            setStory(null);
+             toast({ // Add toast on fetch error
+                title: "Error Loading Story",
+                description: "Could not load story details. Please try again later.",
+                variant: "destructive",
+            });
+          } finally {
+            setIsLoading(false);
+          }
         };
-        if (!authLoading && slug) { // Fetch only when auth is resolved and slug is present
             fetchStory();
-        }
-    }, [slug, user?.id, authLoading, toast]); // Dependency array
+    }, [slug, user?.id, toast]); // Added toast to dependency array
 
     // --- Handlers ---
     const handleCommentSubmit = async () => {
@@ -279,9 +289,10 @@ const StoryDetailPage: NextPage<StoryPageProps> = (props) => {
     };
 
     // --- Render Logic ---
-    if (isLoading || authLoading) {
-        return <div className="flex items-center justify-center min-h-screen"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
+    if (isLoading) { // Use the specific loading state for story data
+        return <StoryDetailLoader />; // Show skeleton loader
     }
+
 
     if (!story) {
         return <div className="text-center py-20 text-xl text-muted-foreground">Story not found or failed to load.</div>;
@@ -593,11 +604,21 @@ const StoryDetailLoader: React.FC = () => (
  );
 
 
-const SuspendedStoryDetailPage: NextPage<StoryPageProps> = (props) => (
-    <Suspense fallback={<StoryDetailLoader />}>
-        <StoryDetailPage {...props} />
-    </Suspense>
-);
+// Component that unwraps the params promise and renders StoryDetailPage
+const StoryPage: NextPage<StoryPageProps> = (props) => {
+    const { slug } = props.params; // Directly access slug since this is a Server Component now
+    return (
+        <Suspense fallback={<StoryDetailLoader />}>
+           {/* Pass slug directly to the client component */}
+            <StoryDetailPage slug={slug} />
+        </Suspense>
+    );
+};
+
+export default StoryPage;
 
 
-export default SuspendedStoryDetailPage;
+// --- Client Side Component ---
+'use client';
+
+

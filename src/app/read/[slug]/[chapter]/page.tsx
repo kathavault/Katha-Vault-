@@ -22,6 +22,8 @@ import { useToast } from '@/hooks/use-toast';
 import { validateCommentData, validateRatingData } from '@/services/validationService';
 import { fetchChapterDetails, submitComment, submitRating } from '@/lib/readerService';
 import type { Timestamp } from 'firebase/firestore';
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"; // Import Alert
+import { Skeleton } from '@/components/ui/skeleton'; // Import Skeleton
 
 interface ChapterDetails {
   title: string;
@@ -56,6 +58,8 @@ interface ReadPageProps {
 }
 
 const formatContent = (text: string): React.ReactNode[] => {
+  if (!text) return [<p key="empty-content">(No content available)</p>];
+
   const paragraphs = text.trim().split(/\n\s*\n/);
   return paragraphs.map((p, i) => {
     if (p.startsWith('&gt; ')) {
@@ -107,8 +111,42 @@ const formatContent = (text: string): React.ReactNode[] => {
   });
 };
 
+// Loader component for Suspense boundary
+const ChapterLoader: React.FC = () => (
+     <div className="flex flex-col min-h-screen">
+         <header className="sticky top-0 z-40 w-full border-b bg-background/90 backdrop-blur supports-[backdrop-filter]:bg-background/75 shadow-sm">
+            <div className="container flex h-14 items-center justify-between px-4 md:px-6 gap-2">
+                 {/* Skeleton for header elements */}
+                 <Skeleton className="h-8 w-1/4" />
+                 <Skeleton className="h-8 w-1/4" />
+            </div>
+            <Skeleton className="w-full h-1 rounded-none" />
+         </header>
+         <main className="flex-grow container max-w-3xl mx-auto px-4 py-8 md:py-12 space-y-4">
+             <Skeleton className="h-8 w-3/4 mb-4" />
+             <Skeleton className="h-4 w-full" />
+             <Skeleton className="h-4 w-full" />
+             <Skeleton className="h-4 w-5/6" />
+             <Skeleton className="h-4 w-full" />
+             <Skeleton className="h-4 w-1/2" />
+             <Skeleton className="h-4 w-full" />
+             <Skeleton className="h-4 w-3/4" />
+         </main>
+         <footer className="w-full border-t bg-secondary/50 mt-8 py-6">
+            <div className="container max-w-3xl mx-auto px-4 space-y-6">
+                 <Skeleton className="h-8 w-1/3" />
+                 <Skeleton className="h-10 w-1/2" />
+                 <Separator />
+                 <Skeleton className="h-8 w-1/4" />
+                 <Skeleton className="h-20 w-full" />
+            </div>
+         </footer>
+     </div>
+ );
+
 
 const ReadingPage: NextPage<ReadPageProps> = (props) => {
+  // --- Hooks and State ---
   const resolvedParams = use(props.params); // Unwrap the promise
   const { slug, chapter: chapterString } = resolvedParams;
   const chapterNumber = parseInt(chapterString, 10);
@@ -117,16 +155,20 @@ const ReadingPage: NextPage<ReadPageProps> = (props) => {
   const { toast } = useToast();
   const [chapterData, setChapterData] = useState<ChapterDetailsResult | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [errorLoading, setErrorLoading] = useState<string | null>(null); // State to hold error messages
   const [commentText, setCommentText] = useState('');
   const [rating, setRating] = useState(0);
   const [isSubmittingComment, setIsSubmittingComment] = useState(false);
   const [isSubmittingRating, setIsSubmittingRating] = useState(false);
   const [comments, setComments] = useState<CommentData[]>([]);
 
-
+  // --- Data Fetching ---
   useEffect(() => {
     const fetchChapter = async () => {
+      setErrorLoading(null); // Reset error on new fetch
       if (!slug || isNaN(chapterNumber) || chapterNumber < 1) {
+        console.error("Invalid slug or chapter number for fetching.", { slug, chapterNumber });
+        setErrorLoading("Invalid story or chapter specified.");
         setChapterData(null);
         setIsLoading(false);
         return;
@@ -134,26 +176,41 @@ const ReadingPage: NextPage<ReadPageProps> = (props) => {
       setIsLoading(true);
       try {
         const data = await fetchChapterDetails(slug, chapterNumber, user?.id); // Pass user ID
-        setChapterData(data);
-        setRating(data?.userRating || 0);
-        setComments(data?.comments || []);
+        if (data) {
+            setChapterData(data);
+            setRating(data?.userRating || 0);
+            setComments(data?.comments || []);
+        } else {
+            // Handle case where fetch returns null (not found or other handled error)
+            setErrorLoading("Could not load chapter. It might not exist or there was an issue retrieving it.");
+            setChapterData(null);
+        }
       } catch (error) {
-        console.error("Error fetching chapter details:", error);
+        console.error("Unhandled error fetching chapter details:", error);
+        const errorMessage = error instanceof Error ? error.message : "An unknown error occurred.";
+        setErrorLoading(`Failed to load chapter: ${errorMessage}`);
         setChapterData(null);
-        toast({
-          title: "Error Loading Chapter",
-          description: "Could not load the chapter content. Please try again later.",
-          variant: "destructive",
-        });
+        // Optional: Show toast for unhandled errors
+        // toast({
+        //   title: "Error Loading Chapter",
+        //   description: "An unexpected error occurred.",
+        //   variant: "destructive",
+        // });
       } finally {
         setIsLoading(false);
       }
     };
-    if (slug && !isNaN(chapterNumber)) { // Ensure slug and chapterNumber are valid before fetching
+    // Fetch only when auth is resolved and params are valid
+    if (!authLoading && slug && !isNaN(chapterNumber)) {
         fetchChapter();
+    } else if (!authLoading && ( !slug || isNaN(chapterNumber) )) {
+        // If auth is loaded but params are invalid, stop loading and set error
+        setIsLoading(false);
+        setErrorLoading("Invalid story or chapter specified.");
     }
-  }, [slug, chapterNumber, toast, user?.id]); // Re-fetch if user ID changes
+  }, [slug, chapterNumber, toast, user?.id, authLoading]); // Add authLoading to dependencies
 
+  // --- Handlers ---
   const handleCommentSubmit = async () => {
     if (!user || !chapterData) {
       toast({ title: "Login Required", description: "Please log in to leave a comment.", variant: "destructive" });
@@ -233,10 +290,28 @@ const ReadingPage: NextPage<ReadPageProps> = (props) => {
     toast({ title: "Share Feature (Coming Soon)", description: "Sharing options will be available here." });
   };
 
-  if (isLoading || authLoading || !slug || isNaN(chapterNumber)) { // Add checks for slug and chapterNumber validity
-    return <div className="flex items-center justify-center min-h-screen"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
+  // --- Render Logic ---
+  // Show loader while authentication is resolving OR data is loading
+  if (authLoading || isLoading) {
+    return <ChapterLoader />; // Show skeleton loader
   }
 
+  // Show error message if loading finished with an error
+  if (errorLoading) {
+      return (
+          <div className="flex items-center justify-center min-h-screen text-center p-4">
+              <Alert variant="destructive">
+                  <AlertTitle>Error Loading Chapter</AlertTitle>
+                  <AlertDescription>{errorLoading}</AlertDescription>
+                  <Button variant="outline" asChild className="mt-4">
+                     <Link href={slug ? `/story/${slug}` : '/browse'}>Go Back</Link>
+                  </Button>
+              </Alert>
+          </div>
+      );
+  }
+
+  // Show not found if loading finished and chapterData is still null (and no error was set explicitly)
   if (!chapterData) {
     return (
       <div className="text-center py-20 flex flex-col items-center gap-4">
@@ -244,10 +319,7 @@ const ReadingPage: NextPage<ReadPageProps> = (props) => {
           Chapter Not Found
         </p>
         <p className="text-muted-foreground">
-          {isNaN(chapterNumber) || chapterNumber < 1
-            ? 'The chapter number specified in the URL is not valid.'
-            : "We couldn't find the chapter you were looking for."
-          }
+          We couldn't find the chapter you were looking for. It might have been moved or deleted.
         </p>
         <Button variant="outline" asChild>
           <Link href={slug ? `/story/${slug}` : '/browse'}>Go to Story Details</Link>
@@ -256,11 +328,14 @@ const ReadingPage: NextPage<ReadPageProps> = (props) => {
     );
   }
 
+  // Destructure data only after confirming it exists
   const { title, content, storyTitle, storyAuthor, totalChapters } = chapterData;
   const hasPreviousChapter = chapterNumber > 1;
   const hasNextChapter = chapterNumber < totalChapters;
-  const progress = Math.round((chapterNumber / totalChapters) * 100);
+  const progress = totalChapters > 0 ? Math.round((chapterNumber / totalChapters) * 100) : 0; // Avoid division by zero
 
+
+  // --- Main Component Render ---
   return (
     <div className="flex flex-col min-h-screen">
       <header className="sticky top-0 z-40 w-full border-b bg-background/90 backdrop-blur supports-[backdrop-filter]:bg-background/75 shadow-sm">
@@ -437,7 +512,7 @@ const ReadingPage: NextPage<ReadPageProps> = (props) => {
 };
 
 const SuspendedReadingPage: NextPage<ReadPageProps> = (props) => (
-  <Suspense fallback={<div className="flex items-center justify-center min-h-screen"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>}>
+  <Suspense fallback={<ChapterLoader />}>
       <ReadingPage {...props} />
   </Suspense>
 );
