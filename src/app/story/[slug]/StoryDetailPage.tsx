@@ -24,7 +24,7 @@ import {
     Bookmark,
     Heart,
 } from 'lucide-react';
-import Image from 'next/image'; 
+import Image from 'next/image';
 import { useAuth } from '@/hooks/use-auth';
 import { Textarea } from '@/components/ui/textarea'; // Import Textarea
 import { useToast } from '@/hooks/use-toast';
@@ -50,12 +50,13 @@ const StoryDetailPage: React.FC<StoryDetailPageProps> = ({ slug }) => {
     const [isSubmittingRating, setIsSubmittingRating] = useState(false);
     const [isTogglingLibrary, setIsTogglingLibrary] = useState(false);
     const [comments, setComments] = useState<StoryCommentData[]>([]);
-    
+
     // --- Data Fetching ---
     useEffect(() => {
         const fetchStory = async () => {
             setIsLoading(true);
             try {
+                // Pass userId if available to check library status and user rating
                 const data = await fetchStoryDetails(slug, user?.id);
                 setStory(data);
                 setRating(data?.userRating || 0);
@@ -73,8 +74,11 @@ const StoryDetailPage: React.FC<StoryDetailPageProps> = ({ slug }) => {
                 setIsLoading(false);
             }
         };
-        fetchStory();    
-    }, [slug, user?.id, toast]); // Added toast to dependency array
+         if (!authLoading) { // Fetch only when auth state is resolved
+              fetchStory();
+         }
+    }, [slug, user?.id, toast, authLoading]); // Added authLoading dependency
+
 
     // --- Handlers ---
     const handleCommentSubmit = async () => {
@@ -211,7 +215,7 @@ const StoryDetailPage: React.FC<StoryDetailPageProps> = ({ slug }) => {
     };
 
     // --- Render Logic ---
-    if (isLoading) { // Use the specific loading state for story data
+    if (isLoading || authLoading) { // Use the specific loading state for story data + auth
         return <StoryDetailLoader />; // Show skeleton loader
     }
 
@@ -219,11 +223,10 @@ const StoryDetailPage: React.FC<StoryDetailPageProps> = ({ slug }) => {
     if (!story) {
         return <div className="text-center py-20 text-xl text-muted-foreground">Story not found or failed to load.</div>;
     }
-    
+
     const displayRating = story.averageRating ? story.averageRating.toFixed(1) : 'N/A';
 
-    // Custom summary for Dil Ke Raaste
-    const dilKeRaasteSummary = `Dil Ke Raaste ek dil ko chhoo lene wali romantic kahani hai jo Anaya, ek kalpnik aur pratibhashali ladki, aur Aarav, ek safal lekin thoda reserved vyapari, ke beech ke rishton par adharit hai. Jab unke parivaron ke beech ek achanak rishta tay hota hai, to dono ki zindagi ek naye mod par aa jati hai.\n\nYeh kahani parivaarik ummeedein, samajik dabav aur vyakti ke sapno ke beech pyaar, vishwas aur samarpan ki yatra hai.`; //fixed summary line 225-226.
+    // Removed dilKeRaasteSummary definition
 
     return (
         <div className="container mx-auto py-6 md:py-10">
@@ -239,7 +242,7 @@ const StoryDetailPage: React.FC<StoryDetailPageProps> = ({ slug }) => {
             <section className="mb-8 md:mb-12 flex justify-center">
                 <div className="relative w-full max-w-xs sm:max-w-sm md:max-w-md aspect-[2/3] overflow-hidden rounded-lg shadow-lg border border-border/80">
                     <Image
-                        src={story.coverImageUrl || `https://picsum.photos/seed/${story.slug}/400/600`} // Fallback image
+                        src={story.slug === 'dil-ke-raaste' ? 'https://i.imgur.com/F6H94Zd.png' : (story.coverImageUrl || `https://picsum.photos/seed/${story.slug}/400/600`)} // Conditional image for Dil Ke Raaste
                         alt={`Cover for ${story.title}`}
                         fill
                         sizes="(max-width: 640px) 80vw, (max-width: 768px) 40vw, 33vw"
@@ -248,7 +251,7 @@ const StoryDetailPage: React.FC<StoryDetailPageProps> = ({ slug }) => {
                         data-ai-hint={story.dataAiHint || "book cover story detail large"}
                     />
                 </div>
-            </section> 
+            </section>
 
 
             {/* Rating and Social Share (Added below image) */}
@@ -339,7 +342,7 @@ const StoryDetailPage: React.FC<StoryDetailPageProps> = ({ slug }) => {
                          </CardContent>
                      </Card>
 
-                    {/* Tags *}
+                    {/* Tags */}
                     {story.tags && story.tags.length > 0 && (
                         <Card>
                             <CardHeader className="p-4 pb-2"><CardTitle className="text-base font-semibold">Tags</CardTitle></CardHeader>
@@ -363,14 +366,8 @@ const StoryDetailPage: React.FC<StoryDetailPageProps> = ({ slug }) => {
                     <Card>
                         <CardHeader><CardTitle className="text-xl font-semibold">Story Summary</CardTitle></CardHeader>
                         <CardContent className="prose dark:prose-invert max-w-none">
-                           {/* Conditional rendering for Dil Ke Raaste */}
-                            {story.slug === 'dil-ke-raaste' ? (
-                               <div className="text-base leading-relaxed whitespace-pre-line">
-                                   <p>{dilKeRaasteSummary}</p>
-                               </div>
-                           ) : (
-                               <p className="text-base leading-relaxed whitespace-pre-line">{story.description}</p>
-                           )}
+                            {/* Removed conditional rendering for Dil Ke Raaste summary */}
+                             <p className="text-base leading-relaxed whitespace-pre-line">{story.description}</p>
                         </CardContent>
                     </Card>
 
@@ -484,6 +481,8 @@ const StoryDetailPage: React.FC<StoryDetailPageProps> = ({ slug }) => {
     );
 };
 
+
+// Define StoryDetailLoader component
 const StoryDetailLoader: React.FC = () => (
     <div className="container mx-auto py-6 md:py-10">
         <section className="mb-8 md:mb-12 text-center space-y-3">
@@ -509,7 +508,7 @@ const StoryDetailLoader: React.FC = () => (
                       <Skeleton className="h-12 w-full" />
                   </div>
                    <Card><CardContent className="p-4 space-y-3"><Skeleton className="h-5 w-full" /><Skeleton className="h-5 w-full" /><Skeleton className="h-5 w-full" /></CardContent></Card>
-                   <Card><CardContent className="p-4"><Skeleton className="h-6 w-1/2" /></CardContent></Card>
+                   <Card><CardHeader className="p-4 pb-2"><Skeleton className="h-6 w-1/2" /></CardHeader><CardContent className="p-4 pt-0"><div className="flex flex-wrap gap-2"><Skeleton className="h-5 w-16" /><Skeleton className="h-5 w-20" /><Skeleton className="h-5 w-14" /></div></CardContent></Card>
                </aside>
               <main className="md:col-span-8 lg:col-span-9 space-y-8">
                   <Card><CardHeader><Skeleton className="h-6 w-1/4" /></CardHeader><CardContent><Skeleton className="h-20 w-full" /></CardContent></Card>
@@ -522,3 +521,5 @@ const StoryDetailLoader: React.FC = () => (
  );
 
 
+export default StoryDetailPage;
+export { StoryDetailLoader }; // Export the loader
