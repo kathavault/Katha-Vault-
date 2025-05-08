@@ -1,6 +1,6 @@
 'use client';
-import { Skeleton } from '@/components/ui/skeleton'; // Import Skeleton
-import React, { useEffect, useState, Suspense, use } from 'react';
+import { Skeleton } from '@/components/ui/skeleton';
+import React, { useEffect, useState } from 'react';
 import Link from 'next/link'; // Import Link
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -24,7 +24,7 @@ import {
     Bookmark,
     Heart,
 } from 'lucide-react';
-import Image from 'next/image';
+import Image from 'next/image'; 
 import { useAuth } from '@/hooks/use-auth';
 import { Textarea } from '@/components/ui/textarea'; // Import Textarea
 import { useToast } from '@/hooks/use-toast';
@@ -50,7 +50,7 @@ const StoryDetailPage: React.FC<StoryDetailPageProps> = ({ slug }) => {
     const [isSubmittingRating, setIsSubmittingRating] = useState(false);
     const [isTogglingLibrary, setIsTogglingLibrary] = useState(false);
     const [comments, setComments] = useState<StoryCommentData[]>([]);
-
+    
     // --- Data Fetching ---
     useEffect(() => {
         const fetchStory = async () => {
@@ -73,7 +73,7 @@ const StoryDetailPage: React.FC<StoryDetailPageProps> = ({ slug }) => {
                 setIsLoading(false);
             }
         };
-        fetchStory();
+        fetchStory();    
     }, [slug, user?.id, toast]); // Added toast to dependency array
 
     // --- Handlers ---
@@ -219,11 +219,11 @@ const StoryDetailPage: React.FC<StoryDetailPageProps> = ({ slug }) => {
     if (!story) {
         return <div className="text-center py-20 text-xl text-muted-foreground">Story not found or failed to load.</div>;
     }
-
+    
     const displayRating = story.averageRating ? story.averageRating.toFixed(1) : 'N/A';
 
     // Custom summary for Dil Ke Raaste
-    const dilKeRaasteSummary = `Dil Ke Raaste ek dil ko chhoo lene wali romantic kahani hai jo Anaya, ek kalpnik aur pratibhashali ladki, aur Aarav, ek safal lekin thoda reserved vyapari, ke beech ke rishton par adharit hai. Jab unke parivaron ke beech ek achanak rishta tay hota hai, to dono ki zindagi ek naye mod par aa jati hai.\n\nYeh kahani parivaarik ummeedein, samajik dabav aur vyakti ke sapno ke beech pyaar, vishwas aur samarpan ki yatra hai.`;
+    const dilKeRaasteSummary = `Dil Ke Raaste ek dil ko chhoo lene wali romantic kahani hai jo Anaya, ek kalpnik aur pratibhashali ladki, aur Aarav, ek safal lekin thoda reserved vyapari, ke beech ke rishton par adharit hai. Jab unke parivaron ke beech ek achanak rishta tay hota hai, to dono ki zindagi ek naye mod par aa jati hai.\n\nYeh kahani parivaarik ummeedein, samajik dabav aur vyakti ke sapno ke beech pyaar, vishwas aur samarpan ki yatra hai.`; //fixed summary line 225-226.
 
     return (
         <div className="container mx-auto py-6 md:py-10">
@@ -248,7 +248,7 @@ const StoryDetailPage: React.FC<StoryDetailPageProps> = ({ slug }) => {
                         data-ai-hint={story.dataAiHint || "book cover story detail large"}
                     />
                 </div>
-            </section>
+            </section> 
 
 
             {/* Rating and Social Share (Added below image) */}
@@ -480,16 +480,15 @@ const StoryDetailPage: React.FC<StoryDetailPageProps> = ({ slug }) => {
                    </Card>
 
                 </main>
-            </div>
-        </div>
+            </div></div>
     );
 };
 
-export const StoryDetailLoader: React.FC = () => (
-     <div className="container mx-auto py-6 md:py-10">
+const StoryDetailLoader: React.FC = () => (
+    <div className="container mx-auto py-6 md:py-10">
         <section className="mb-8 md:mb-12 text-center space-y-3">
-           <Skeleton className="h-10 w-3/4 mx-auto" />
-           <Skeleton className="h-6 w-1/4 mx-auto" />
+            <Skeleton className="h-10 w-3/4 mx-auto" />
+            <Skeleton className="h-6 w-1/4 mx-auto" />
         </section>
          <section className="mb-8 md:mb-12 flex justify-center">
             <Skeleton className="w-full max-w-xs sm:max-w-sm md:max-w-md aspect-[2/3] rounded-lg" />
@@ -522,43 +521,4 @@ export const StoryDetailLoader: React.FC = () => (
      </div>
  );
 
-export default StoryDetailPage;
-
-// Loader component for Suspense boundary
-export const StoryDetailLoader: React.FC = () => (
-    <div className="container mx-auto py-6 md:py-10">
-       <section className="mb-8 md:mb-12 text-center space-y-3">
-          <Skeleton className="h-10 w-3/4 mx-auto" />
-          <Skeleton className="h-6 w-1/4 mx-auto" />
-       </section>
-        <section className="mb-8 md:mb-12 flex justify-center">
-           <Skeleton className="w-full max-w-xs sm:max-w-sm md:max-w-md aspect-[2/3] rounded-lg" />
-        </section>
-        <section className="mb-8 md:mb-12 flex flex-col items-center gap-4">
-             <Skeleton className="h-10 w-48" />
-              <div className="flex gap-3">
-                  <Skeleton className="h-8 w-24" />
-                  <Skeleton className="h-8 w-24" />
-                  <Skeleton className="h-8 w-24" />
-              </div>
-         </section>
-
-         <div className="grid grid-cols-1 md:grid-cols-12 gap-6 md:gap-8">
-             <aside className="md:col-span-4 lg:col-span-3 space-y-6">
-                 <div className="space-y-3 sticky top-20">
-                     <Skeleton className="h-12 w-full" />
-                     <Skeleton className="h-12 w-full" />
-                 </div>
-                  <Card><CardContent className="p-4 space-y-3"><Skeleton className="h-5 w-full" /><Skeleton className="h-5 w-full" /><Skeleton className="h-5 w-full" /></CardContent></Card>
-                  <Card><CardContent className="p-4"><Skeleton className="h-6 w-1/2" /></CardContent></Card>
-              </aside>
-             <main className="md:col-span-8 lg:col-span-9 space-y-8">
-                 <Card><CardHeader><Skeleton className="h-6 w-1/4" /></CardHeader><CardContent><Skeleton className="h-20 w-full" /></CardContent></Card>
-                 <Card><CardHeader><Skeleton className="h-6 w-1/4" /></CardHeader><CardContent className="flex items-center gap-4"><Skeleton className="h-16 w-16 rounded-full" /><div className="space-y-2"><Skeleton className="h-5 w-32" /><Skeleton className="h-4 w-24" /></div></CardContent></Card>
-                  <Card><CardHeader><Skeleton className="h-6 w-1/3" /></CardHeader><CardContent className="space-y-2"><Skeleton className="h-10 w-full" /><Skeleton className="h-10 w-full" /><Skeleton className="h-10 w-full" /></CardContent></Card>
-                  <Card><CardHeader><Skeleton className="h-6 w-1/4" /></CardHeader><CardContent className="space-y-4"><Skeleton className="h-24 w-full" /><Skeleton className="h-10 w-full" /><Skeleton className="h-10 w-full" /></CardContent></Card>
-              </main>
-         </div>
-    </div>
-);
 

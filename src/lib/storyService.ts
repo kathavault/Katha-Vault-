@@ -124,7 +124,7 @@ export const fetchStoryDetails = async (slug: string, userId?: string | null): P
         let chaptersData: ChapterSummary[] = [];
         try {
             const chaptersRef = collection(db, "stories", storyId, "chapters");
-            const chaptersQuery = query(chaptersRef, orderBy("order", "asc"));
+            const chaptersQuery = query(chaptersRef, orderBy("order", "asc")); // Order by chapter order
             const chaptersSnapshot = await getDocs(chaptersQuery);
             chaptersData = chaptersSnapshot.docs.map(docSnap => {
                 const chData = docSnap.data();
@@ -138,11 +138,11 @@ export const fetchStoryDetails = async (slug: string, userId?: string | null): P
                  return {
                     id: docSnap.id,
                     title: chData.title || `Chapter ${chData.order || 'N/A'}`,
-                    order: chData.order || 0,
+                    order: chData.order || 0, // Ensure order is a number, default to 0
                     wordCount: chData.wordCount || 0,
                     lastUpdated: chLastUpdatedISO
                 };
-            }).sort((a, b) => a.order - b.order); // Ensure sorting
+            }).sort((a, b) => a.order - b.order); // Ensure sorting client-side as well
             console.log(`Found ${chaptersData.length} chapters for story ${storyId}`);
         } catch (chapterError) {
             console.error(`Error fetching chapters for story ${storyId}:`, chapterError);
@@ -231,8 +231,16 @@ export const fetchStoryDetails = async (slug: string, userId?: string | null): P
              }
         } else if (lastUpdatedTimestamp instanceof Date) { // Handle if it's already a Date object
             lastUpdatedISO = lastUpdatedTimestamp.toISOString();
-        } else {
-            console.warn(`Unexpected type for lastUpdated: ${typeof lastUpdatedTimestamp}`);
+        } else if (lastUpdatedTimestamp) { // Check if it exists but is not recognized type
+             console.warn(`Unexpected type for lastUpdated: ${typeof lastUpdatedTimestamp}`);
+             // Attempt to convert if it's an object with seconds/nanoseconds (older Firestore format)
+             if (typeof lastUpdatedTimestamp === 'object' && 'seconds' in lastUpdatedTimestamp && 'nanoseconds' in lastUpdatedTimestamp) {
+                  try {
+                       lastUpdatedISO = new Timestamp(lastUpdatedTimestamp.seconds, lastUpdatedTimestamp.nanoseconds).toDate().toISOString();
+                  } catch {
+                       console.warn('Failed to convert object timestamp to Date.');
+                  }
+             }
         }
 
 
@@ -249,7 +257,7 @@ export const fetchStoryDetails = async (slug: string, userId?: string | null): P
             coverImageUrl: storyData.coverImageUrl,
             reads: storyData.reads || 0,
             author: author, // Assign the Author object
-            authorFollowers: storyData.authorFollowers || 0,
+            authorFollowers: storyData.authorFollowers || 0, // Assuming this field exists
             chapters: chaptersData.length, // Count fetched chapters
             chaptersData: chaptersData,
             lastUpdated: lastUpdatedISO, // Use formatted string
@@ -406,4 +414,3 @@ function safeGetData<T>(docSnap: FirebaseFirestore.DocumentSnapshot<FirebaseFire
         return null;
     }
 }
-

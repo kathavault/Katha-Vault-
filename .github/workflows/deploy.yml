@@ -42,28 +42,40 @@ jobs:
         run: |
           # Export NEXT_PUBLIC variables needed during build/export time
           # Note: These are used during the build, not runtime on GitHub Pages
-          # export NEXT_PUBLIC_FIREBASE_API_KEY=${{ secrets.NEXT_PUBLIC_FIREBASE_API_KEY }}
-          # export NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=${{ secrets.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN }}
-          # export NEXT_PUBLIC_FIREBASE_PROJECT_ID=${{ secrets.NEXT_PUBLIC_FIREBASE_PROJECT_ID }}
+          # You MUST set these as environment variables in the Vercel/GitHub Actions settings if they are required
+          # Example:
+          # export NEXT_PUBLIC_FIREBASE_API_KEY=${{ vars.NEXT_PUBLIC_FIREBASE_API_KEY }}
+          # export NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=${{ vars.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN }}
           # ... add others if needed for the STATIC export build ...
+
+          # Default values if vars aren't set (useful for local testing or basic deployments)
+          export NEXT_PUBLIC_FIREBASE_API_KEY=${NEXT_PUBLIC_FIREBASE_API_KEY:-AIzaSyDT4-R0H8uydAqzrTsHfMKLXQ59p7u67Ho}
+          export NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=${NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN:-katha-vault-novel.firebaseapp.com}
+          export NEXT_PUBLIC_FIREBASE_PROJECT_ID=${NEXT_PUBLIC_FIREBASE_PROJECT_ID:-katha-vault-novel}
+          export NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=${NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET:-katha-vault-novel.appspot.com}
+          export NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=${NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID:-1050410197456}
+          export NEXT_PUBLIC_FIREBASE_APP_ID=${NEXT_PUBLIC_FIREBASE_APP_ID:-1:1050410197456:web:3add67c05dac9fe2c419d5}
+          # export NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID=... # Optional
 
           npm run build # This should now use the 'export' output defined in next.config.js
         env:
-          # Define any build-time env vars needed here
-          # NEXT_PUBLIC_FIREBASE_API_KEY: ${{ secrets.NEXT_PUBLIC_FIREBASE_API_KEY }}
-          # ... etc ...
-          # Important: GitHub Pages only serves static files, runtime env vars won't work
-          # Ensure your app logic doesn't heavily rely on runtime env vars if exporting
-          NEXT_PUBLIC_SOME_CONFIG: "static_value" # Example
+          # Define any build-time env vars needed here using repository secrets or variables
+          # Example using repository variables (preferred over secrets for non-sensitive keys)
+          NEXT_PUBLIC_FIREBASE_API_KEY: ${{ vars.NEXT_PUBLIC_FIREBASE_API_KEY }}
+          NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: ${{ vars.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN }}
+          NEXT_PUBLIC_FIREBASE_PROJECT_ID: ${{ vars.NEXT_PUBLIC_FIREBASE_PROJECT_ID }}
+          NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: ${{ vars.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET }}
+          NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: ${{ vars.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID }}
+          NEXT_PUBLIC_FIREBASE_APP_ID: ${{ vars.NEXT_PUBLIC_FIREBASE_APP_ID }}
+          # NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID: ${{ vars.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID }} # Optional
 
       - name: Setup Pages
         uses: actions/configure-pages@v5
       - name: Upload artifact
-        uses: actions/upload-pages-artifact@v3
+        uses: actions/upload-pages-artifact@v3 # Use v3 or later
         with:
           # Upload the exported content from the 'out' directory
-          path: './out'
+          path: './out' # Correct path for Next.js static export
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
-    

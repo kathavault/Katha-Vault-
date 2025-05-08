@@ -21,30 +21,11 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useToast } from '@/hooks/use-toast';
 import { validateCommentData, validateRatingData } from '@/services/validationService';
 import { fetchChapterDetails, submitComment, submitRating } from '@/lib/readerService';
+import { fetchStoryDetails, getStories } from '@/lib/storyService'; // Import getStories
 import type { Timestamp } from 'firebase/firestore';
+import type { ChapterDetailsResult, CommentData, SubmitCommentParams, SubmitRatingParams } from '@/types';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"; // Import Alert
 import { Skeleton } from '@/components/ui/skeleton'; // Import Skeleton
-
-interface ChapterDetails {
-  title: string;
-  content: string;
-  storyTitle: string;
-  storyAuthor: string;
-  totalChapters: number;
-  storyId: string;
-  chapterId: string;
-  comments?: CommentData[];
-  userRating?: number;
-}
-
-interface CommentData {
-  id: string;
-  userId: string;
-  userName: string;
-  userAvatar?: string | null;
-  text: string;
-  timestamp: Date;
-}
 
 // Define the shape of the resolved params
 interface ReadPageResolvedParams {
@@ -56,6 +37,45 @@ interface ReadPageResolvedParams {
 interface ReadPageProps {
   params: Promise<ReadPageResolvedParams>;
 }
+
+// Required for static export with dynamic routes for chapters
+// export async function generateStaticParams(): Promise<{ slug: string; chapter: string }[]> {
+//   console.log("generateStaticParams for /read/[slug]/[chapter] running...");
+//   const stories = await getStories(); // Get slugs
+//   if (!stories || stories.length === 0) {
+//     console.warn("No stories found for generateStaticParams in /read/[slug]/[chapter].");
+//     return [];
+//   }
+
+//   const allParams: { slug: string; chapter: string }[] = [];
+
+//   for (const story of stories) {
+//     if (!story.slug) continue;
+//     try {
+//       // Fetch basic chapter info (like chapter count or orders) for each story
+//       // This requires a function like `fetchStoryChaptersSummary(story.slug)`
+//       // For now, let's assume a max chapter count or fetch it (can be slow)
+//       const storyDetails = await fetchStoryDetails(story.slug); // Fetch details to get chapter count/orders
+//       if (storyDetails && storyDetails.chaptersData) {
+//         storyDetails.chaptersData.forEach(chapterSummary => {
+//             if (chapterSummary.order) { // Use order field
+//                  allParams.push({ slug: story.slug, chapter: chapterSummary.order.toString() });
+//             }
+//         });
+//       } else {
+//         console.warn(`No chapters found for story slug: ${story.slug}`);
+//         // Optionally generate a default chapter 1 param if needed
+//         // allParams.push({ slug: story.slug, chapter: '1' });
+//       }
+//     } catch (error) {
+//       console.error(`Error fetching chapters for story slug ${story.slug} in generateStaticParams:`, error);
+//     }
+//   }
+
+//   console.log(`Generated ${allParams.length} static params for /read/[slug]/[chapter]:`, allParams.slice(0, 20)); // Log first 20
+//   return allParams;
+// }
+
 
 const formatContent = (text: string): React.ReactNode[] => {
   if (!text) return [<p key="empty-content">(No content available)</p>];
@@ -147,7 +167,7 @@ const ChapterLoader: React.FC = () => (
 
 const ReadingPage: NextPage<ReadPageProps> = (props) => {
   // --- Hooks and State ---
-  const resolvedParams = use(props.params); // Unwrap the promise
+  const resolvedParams = use(props.params); // Correctly unwrap the promise
   const { slug, chapter: chapterString } = resolvedParams;
   const chapterNumber = parseInt(chapterString, 10);
 

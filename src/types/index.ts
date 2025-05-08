@@ -103,7 +103,7 @@ export interface Author {
 export interface ChapterSummary {
     id: string;
     title: string;
-    order: number;
+    order: number; // Make order required for reliable sorting
     wordCount?: number;
     lastUpdated?: string; // ISO string or undefined
 }
@@ -114,7 +114,7 @@ export interface StoryDetailsResult extends Omit<Story, 'id' | 'authorId' | 'aut
     author: Author; // Use the Author interface
     chaptersData: ChapterSummary[];
     authorFollowers: number; // Example additional data
-    lastUpdated: string; // Ensure lastUpdated is always a string (ISO format)
+    lastUpdated: string; // Ensure lastUpdated is always a string (ISO format) after processing
     averageRating?: number; // Calculated average rating for the story
     totalRatings?: number; // Total number of ratings for the story
     comments?: StoryCommentData[]; // Processed comments with Date objects
