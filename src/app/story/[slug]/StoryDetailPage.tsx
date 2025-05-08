@@ -1,98 +1,6 @@
-// --- Server Side Components ---
-// --- Type Definitions ---
 'use client';
+
 import React, { useEffect, useState, Suspense, use } from 'react';
-
-
-
-import { fetchStoryDetails, submitStoryComment, submitStoryRating, toggleLibraryStatus, getStories } from '@/lib/storyService'; // Added getStories
-import type { NextPage } from 'next';
-import type { Story as BaseStory } from '@/components/story/story-card';
-import type { Timestamp } from 'firebase/firestore';
-
-interface Author {
-    name: string;
-    id: string;
-    avatarUrl?: string;
-}
-
-interface StoryCommentData {
-    id: string;
-    userId: string;
-    userName: string;
-    userAvatar?: string | null;
-    text: string;
-    timestamp: Date;
-}
-
-interface ChapterSummary {
-    id: string;
-    title: string;
-    order: number;
-    wordCount?: number;
-    lastUpdated?: string; // ISO string
-}
-
-// This should match the one in the page component
-interface StoryDetailsResult {
-    id: string;
-    title: string;
-    description: string;
-    genre: string;
-    tags: string[];
-    status: 'Draft' | 'Published' | 'Archived' | 'Ongoing' | 'Completed';
-    authorId: string;
-    authorName: string; // Ensure this is fetched
-    coverImageUrl?: string;
-    reads?: number;
-    author: Author;
-    authorFollowers: number;
-    chapters: number; // Explicit chapters count
-    chaptersData: ChapterSummary[];
-    lastUpdated: string; // ISO string for consistency
-    averageRating?: number;
-    totalRatings?: number;
-    comments?: StoryCommentData[];
-    userRating?: number;
-    isInLibrary?: boolean;
-    slug: string;
-    dataAiHint?: string;
-    // Ensure all fields from src/types Story are here or correctly mapped
-}
-
-interface StoryPageResolvedParams {
-    slug: string;
-}
-
-interface StoryParams {
-  slug: string;
-}
-
-interface StoryPageProps {
-  params: StoryParams;
-}
-
-// Required for static export with dynamic routes
-export async function generateStaticParams() {
-    const stories = await getStories(); // Assuming getStories fetches all necessary story slugs
-    return stories.map((story) => ({
-        slug: story.slug,
-    }));
-}
-
-// --- Client Side Component ---
-
-
-const StoryPage: NextPage<StoryPageProps> = (props) => {
-    const { slug } = props.params; // Directly access slug since this is a Server Component now
-    return (
-        <Suspense fallback={<StoryDetailLoader />}>
-           {/* Pass slug directly to the client component */}
-            <StoryDetailPage slug={slug} />
-        </Suspense>
-    );
-};
-
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -121,13 +29,19 @@ import { useAuth } from '@/hooks/use-auth';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { validateCommentData, validateRatingData } from '@/services/validationService';
-// Removed duplicate fetchStoryDetails import
-import { Skeleton } from '@/components/ui/skeleton'; // Import Skeleton   
-const StoryDetailPage: React.FC<{ slug: string }> = ({ slug }) => {
+import { Skeleton } from '@/components/ui/skeleton';
+import { StoryDetailsResult, StoryCommentData } from './types';
+import { fetchStoryDetails, submitStoryComment, submitStoryRating, toggleLibraryStatus } from '@/lib/storyService';
+
+interface StoryDetailPageProps {
+    slug: string;
+}
+
+const StoryDetailPage: React.FC<StoryDetailPageProps> = ({ slug }) => {
     // --- Hooks and State ---
 
     const { user, isLoading: authLoading } = useAuth(); // Removed unused authLoading
-        const { toast } = useToast();
+    const { toast } = useToast();
     const [story, setStory] = useState<StoryDetailsResult | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [commentText, setCommentText] = useState('');
@@ -141,26 +55,26 @@ const StoryDetailPage: React.FC<{ slug: string }> = ({ slug }) => {
     // --- Data Fetching ---
     useEffect(() => {
         const fetchStory = async () => {
-          setIsLoading(true);
-          try {
-            const data = await fetchStoryDetails(slug, user?.id);
-            setStory(data);
-            setRating(data?.userRating || 0);
-            setIsInLibrary(data?.isInLibrary || false);
-            setComments(data?.comments || []);
-          } catch (error) {
-            console.error("Error fetching story details:", error);
-            setStory(null);
-             toast({ // Add toast on fetch error
-                title: "Error Loading Story",
-                description: "Could not load story details. Please try again later.",
-                variant: "destructive",
-            });
-          } finally {
-            setIsLoading(false);
-          }
-                };
-            fetchStory();
+            setIsLoading(true);
+            try {
+                const data = await fetchStoryDetails(slug, user?.id);
+                setStory(data);
+                setRating(data?.userRating || 0);
+                setIsInLibrary(data?.isInLibrary || false);
+                setComments(data?.comments || []);
+            } catch (error) {
+                console.error("Error fetching story details:", error);
+                setStory(null);
+                toast({ // Add toast on fetch error
+                    title: "Error Loading Story",
+                    description: "Could not load story details. Please try again later.",
+                    variant: "destructive",
+                });
+            } finally {
+                setIsLoading(false);
+            }
+        };
+        fetchStory();
     }, [slug, user?.id, toast]); // Added toast to dependency array
 
     // --- Handlers ---
@@ -221,7 +135,7 @@ const StoryDetailPage: React.FC<{ slug: string }> = ({ slug }) => {
             });
             toast({ title: "Rating Submitted", description: `You rated this story ${newRating} stars.` });
             // Optionally re-fetch story details to update average rating display accurately
-            // fetchStoryDetails(slug, user?.id).then(data => { if(data) setStory(data); });
+             fetchStoryDetails(slug, user?.id).then(data => { if(data) setStory(data); }); // Re-fetch to update average
         } catch (error) {
             console.error("Error submitting story rating:", error);
             toast({ title: "Error Submitting Rating", description: "Could not save your rating. Please try again.", variant: "destructive" });
@@ -310,9 +224,7 @@ const StoryDetailPage: React.FC<{ slug: string }> = ({ slug }) => {
     const displayRating = story.averageRating ? story.averageRating.toFixed(1) : 'N/A';
 
     // Custom summary for Dil Ke Raaste
-    const dilKeRaasteSummary = `Dil Ke Raaste ek dil ko chhoo lene wali romantic kahani hai jo Anaya, ek kalpnik aur pratibhashali ladki, aur Aarav, ek safal lekin thoda reserved vyapari, ke beech ke rishton par adharit hai. Jab unke parivaron ke beech ek achanak rishta tay hota hai, to dono ki zindagi ek naye mod par aa jati hai.
-
-Yeh kahani parivaarik ummeedein, samajik dabav aur vyakti ke sapno ke beech pyaar, vishwas aur samarpan ki yatra hai.`;
+    const dilKeRaasteSummary = `Dil Ke Raaste ek dil ko chhoo lene wali romantic kahani hai jo Anaya, ek kalpnik aur pratibhashali ladki, aur Aarav, ek safal lekin thoda reserved vyapari, ke beech ke rishton par adharit hai. Jab unke parivaron ke beech ek achanak rishta tay hota hai, to dono ki zindagi ek naye mod par aa jati hai.\n\nYeh kahani parivaarik ummeedein, samajik dabav aur vyakti ke sapno ke beech pyaar, vishwas aur samarpan ki yatra hai.`;
 
     return (
         <div className="container mx-auto py-6 md:py-10">
@@ -325,24 +237,24 @@ Yeh kahani parivaarik ummeedein, samajik dabav aur vyakti ke sapno ke beech pyaa
             </section>
 
             {/* Cover Image Section */}
-             <section className="mb-8 md:mb-12 flex justify-center">
-                 <div className="relative w-full max-w-xs sm:max-w-sm md:max-w-md aspect-[2/3] overflow-hidden rounded-lg shadow-lg border border-border/80">
-                     <Image
-                         src={story.coverImageUrl || `https://picsum.photos/seed/${story.slug}/400/600`} // Fallback image
-                         alt={`Cover for ${story.title}`}
-                         fill
-                         sizes="(max-width: 640px) 80vw, (max-width: 768px) 40vw, 33vw"
-                         className="object-cover"
-                         priority // Consider making this dynamic if needed
-                         data-ai-hint={story.dataAiHint || "book cover story detail large"}
-                     />
-                 </div>
-             </section>
+            <section className="mb-8 md:mb-12 flex justify-center">
+                <div className="relative w-full max-w-xs sm:max-w-sm md:max-w-md aspect-[2/3] overflow-hidden rounded-lg shadow-lg border border-border/80">
+                    <Image
+                        src={story.coverImageUrl || `https://picsum.photos/seed/${story.slug}/400/600`} // Fallback image
+                        alt={`Cover for ${story.title}`}
+                        fill
+                        sizes="(max-width: 640px) 80vw, (max-width: 768px) 40vw, 33vw"
+                        className="object-cover"
+                        priority // Consider making this dynamic if needed
+                        data-ai-hint={story.dataAiHint || "book cover story detail large"}
+                    />
+                </div>
+            </section>
 
 
             {/* Rating and Social Share (Added below image) */}
             <section className="mb-8 md:mb-12 flex flex-col items-center gap-4">
-                 {/* Story Rating */}
+                {/* Story Rating */}
                   <div className="flex items-center gap-1 pt-1">
                       {[1, 2, 3, 4, 5].map((starVal) => (
                            <Button
@@ -477,7 +389,7 @@ Yeh kahani parivaarik ummeedein, samajik dabav aur vyakti ke sapno ke beech pyaa
                             </Link>
                             <div>
                                 <Link href={`/profile/${story.author.id}`} className="text-lg font-semibold text-primary hover:underline">{story.author.name}</Link>
-                                <p className="text-sm text-muted-foreground">{story.authorFollowers.toLocaleString()} Followers</p>
+                                <p className="text-sm text-muted-foreground">{story.authorFollowers?.toLocaleString() || 0} Followers</p>
                                 {/* <Button variant="outline" size="sm" className="mt-2"><Heart className="mr-2 h-4 w-4"/> Follow (Soon)</Button> */}
                             </div>
                         </CardContent>
@@ -612,6 +524,4 @@ const StoryDetailLoader: React.FC = () => (
      </div>
  );
 
-// --- Server Side Components ---
-
-export default StoryPage;
+export default StoryDetailPage;

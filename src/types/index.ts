@@ -11,6 +11,11 @@ export interface Comment {
   timestamp: Date | Timestamp; // Allow both for flexibility
 }
 
+// Explicitly define and export StoryCommentData if it's different or used widely
+export interface StoryCommentData extends Comment {
+  // Add any story-specific comment fields if necessary
+}
+
 
 // Represents a single chapter of a story
 export interface Chapter {
@@ -34,10 +39,10 @@ export interface Story {
   title: string;
   description: string;
   genre: string;
-  tags: string[];
-  status: 'Draft' | 'Published' | 'Archived' | 'Ongoing' | 'Completed'; // Added Ongoing/Completed
+  tags?: string[]; // Make tags optional if they might not exist
+  status?: 'Draft' | 'Published' | 'Archived' | 'Ongoing' | 'Completed'; // Make status optional with default
   authorId: string; // Firestore user ID of the author
-  authorName: string; // Author's display name
+  authorName?: string; // Author's display name (make optional)
   authorAvatarUrl?: string; // Optional author avatar URL (denormalized)
   coverImageUrl?: string;
   chapters?: Chapter[]; // Usually IDs/basic info if not fully embedded. For detail page, full chapter summaries fetched.
@@ -47,7 +52,7 @@ export interface Story {
   slug: string; // URL-friendly identifier
   dataAiHint?: string; // For image generation
 
-  // Story-level aggregated data
+  // Story-level aggregated data (make optional as they might not exist initially)
   totalRatingSum?: number;  // Sum of all ratings for THE STORY
   ratingCount?: number;     // Total number of ratings for THE STORY
   averageRating?: number;   // Calculated: totalRatingSum / ratingCount for THE STORY
@@ -89,4 +94,5 @@ export interface SiteSettings {
     allowUserRegistration: boolean;
     // Add other global settings
 }
+
 

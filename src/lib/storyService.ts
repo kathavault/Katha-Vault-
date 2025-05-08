@@ -17,7 +17,7 @@ import {
     updateDoc,
     increment
 } from 'firebase/firestore';
-import type { Story, Chapter } from '@/types'; // Assuming types are defined
+import type { Story, Chapter, StoryCommentData } from '@/types'; // Assuming types are defined including StoryCommentData
 
 // Define types used in this service
 interface Author {
@@ -26,14 +26,6 @@ interface Author {
     avatarUrl?: string;
 }
 
-interface StoryCommentData {
-    id: string;
-    userId: string;
-    userName: string;
-    userAvatar?: string | null;
-    text: string;
-    timestamp: Date;
-}
 
 interface ChapterSummary {
     id: string;
@@ -138,12 +130,26 @@ export const fetchStoryDetails = async (slug: string, userId?: string | null): P
         const chaptersSnapshot = await getDocs(chaptersQuery);
         const chaptersData: ChapterSummary[] = chaptersSnapshot.docs.map(docSnap => {
             const chData = docSnap.data();
+             const chLastUpdated = chData.lastUpdated;
+             let chLastUpdatedISO: string;
+             if (chLastUpdated instanceof Timestamp) {
+                 chLastUpdatedISO = chLastUpdated.toDate().toISOString();
+             } else if (typeof chLastUpdated === 'string') {
+                  try {
+                      chLastUpdatedISO = new Date(chLastUpdated).toISOString();
+                  } catch {
+                      chLastUpdatedISO = new Date().toISOString(); // Fallback for invalid date string
+                  }
+             } else {
+                 chLastUpdatedISO = new Date().toISOString(); // Fallback
+             }
+
             return {
                 id: docSnap.id,
                 title: chData.title || `Chapter ${chData.order}`,
                 order: chData.order,
                 wordCount: chData.wordCount || 0,
-                lastUpdated: chData.lastUpdated instanceof Timestamp ? chData.lastUpdated.toDate().toISOString() : (chData.lastUpdated || new Date().toISOString())
+                lastUpdated: chLastUpdatedISO
             };
         });
         console.log(`Found ${chaptersData.length} chapters for story ${storyId}`);
@@ -154,13 +160,26 @@ export const fetchStoryDetails = async (slug: string, userId?: string | null): P
         const commentsSnapshot = await getDocs(commentsQuery);
         const comments: StoryCommentData[] = commentsSnapshot.docs.map(docSnap => {
              const data = docSnap.data();
+             const timestamp = data.timestamp;
+              let commentDate: Date;
+              if (timestamp instanceof Timestamp) {
+                  commentDate = timestamp.toDate();
+              } else if (typeof timestamp === 'string') {
+                   try {
+                      commentDate = new Date(timestamp);
+                    } catch {
+                      commentDate = new Date(); // Fallback
+                    }
+              } else {
+                  commentDate = new Date(); // Fallback
+              }
              return {
                  id: docSnap.id,
                  userId: data.userId,
                  userName: data.userName || 'Anonymous',
                  userAvatar: data.userAvatar,
                  text: data.text,
-                 timestamp: (data.timestamp instanceof Timestamp) ? data.timestamp.toDate() : new Date(),
+                 timestamp: commentDate, // Ensure it's a Date object
              };
         });
          console.log(`Found ${comments.length} comments for story ${storyId}`);
@@ -191,7 +210,7 @@ export const fetchStoryDetails = async (slug: string, userId?: string | null): P
 
 
           const author: Author = {
-              id: storyData.authorId,
+              id: storyData.authorId || 'unknown_author', // Add fallback
               name: storyData.authorName || 'Unknown Author',
               avatarUrl: storyData.authorAvatarUrl, // Assuming authorAvatarUrl is stored on story or fetched separately
           };
@@ -208,7 +227,11 @@ export const fetchStoryDetails = async (slug: string, userId?: string | null): P
         if (lastUpdatedTimestamp instanceof Timestamp) {
              lastUpdatedISO = lastUpdatedTimestamp.toDate().toISOString();
         } else if (typeof lastUpdatedTimestamp === 'string') {
-             lastUpdatedISO = new Date(lastUpdatedTimestamp).toISOString();
+             try {
+                 lastUpdatedISO = new Date(lastUpdatedTimestamp).toISOString();
+             } catch {
+                 lastUpdatedISO = new Date().toISOString(); // Fallback for invalid date string
+             }
         } else {
              lastUpdatedISO = new Date().toISOString(); // Fallback
         }
@@ -225,12 +248,12 @@ export const fetchStoryDetails = async (slug: string, userId?: string | null): P
             coverImageUrl: storyData.coverImageUrl,
             reads: storyData.reads || 0,
             author: author,
-            authorFollowers: storyData.authorFollowers || 0,
+            authorFollowers: storyData.authorFollowers || 0, // Add default
             chapters: chaptersData.length,
             chaptersData: chaptersData,
-            lastUpdated: lastUpdatedISO,
+            lastUpdated: lastUpdatedISO, // Ensure it's a string
             averageRating: averageRating,
-            totalRatings: count || 0,
+            totalRatings: count || 0, // Add default
             comments: comments,
             userRating: userRating,
             isInLibrary: isInLibrary,
@@ -265,7 +288,7 @@ export const submitStoryComment = async (params: SubmitStoryCommentParams): Prom
             userAvatar: auth.currentUser.photoURL
         });
         // Optionally update comment count (consider transactions/functions for accuracy)
-        // await updateDoc(doc(db, "stories", storyId), { commentCount: increment(1) });
+         await updateDoc(doc(db, "stories", storyId), { commentCount: increment(1) });
         return { id: newCommentRef.id };
     } catch (error) {
         console.error("Error submitting story comment:", error);
@@ -305,8 +328,8 @@ export const submitStoryRating = async (params: SubmitStoryRatingParams): Promis
             const currentTotalSum = storyDocSnap.data().totalRatingSum || 0;
             const currentRatingCount = storyDocSnap.data().ratingCount || 0;
             await updateDoc(storyRef, {
-                totalRatingSum: currentTotalSum + ratingDiff,
-                ratingCount: currentRatingCount + ratingCountChange
+                totalRatingSum: increment(ratingDiff), // Use increment for atomic update
+                ratingCount: increment(ratingCountChange) // Use increment for atomic update
             });
         } else {
              // Initialize if not present - less likely for an existing story being rated
