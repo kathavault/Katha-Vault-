@@ -69,6 +69,10 @@ jobs:
           NEXT_PUBLIC_FIREBASE_APP_ID: ${{ vars.NEXT_PUBLIC_FIREBASE_APP_ID }}
           # NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID: ${{ vars.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID }} # Optional
 
+      # Add this step for debugging: List the contents of the output directory
+      - name: List output directory content
+        run: ls -R ./out || echo "'out' directory not found or empty"
+
       - name: Setup Pages
         uses: actions/configure-pages@v5
       - name: Upload artifact
