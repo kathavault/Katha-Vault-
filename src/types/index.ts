@@ -110,6 +110,7 @@ export interface ChapterSummary {
 
 // Type for the result returned by fetchStoryDetails
 export interface StoryDetailsResult extends Omit<Story, 'id' | 'authorId' | 'authorName' | 'authorAvatarUrl' | 'lastUpdated'> {
+    [x: string]: ReactNode;
     id: string; // Ensure id is present
     author: Author; // Use the Author interface
     chaptersData: ChapterSummary[];

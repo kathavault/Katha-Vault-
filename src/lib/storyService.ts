@@ -18,7 +18,7 @@ import {
     increment,
     collectionGroup, // Import collectionGroup for potential future use (e.g., finding all chapters)
     runTransaction // Import transaction for atomic updates
-} from 'firebase/firestore';
+} from 'firebase/firestore';import { DocumentSnapshot } from 'firebase/firestore';
 import type { Story, Chapter, StoryCommentData, UserProfile, Author, ChapterSummary, StoryDetailsResult, SubmitStoryCommentParams, SubmitStoryRatingParams } from '@/types'; // Consolidated type imports
 
 
@@ -403,7 +403,7 @@ export const toggleLibraryStatus = async (userId: string, storyId: string, addTo
 };
 
 // Helper function to safely get data - useful if structure varies
-function safeGetData<T>(docSnap: FirebaseFirestore.DocumentSnapshot<FirebaseFirestore.DocumentData>): T | null {
+function safeGetData<T>(docSnap: DocumentSnapshot): T | null {
     if (!docSnap.exists()) {
         return null;
     }
