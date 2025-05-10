@@ -1,36 +1,227 @@
-'use client';
-import { Skeleton } from '@/components/ui/skeleton';
-import React, { useEffect, useState } from 'react';
-import Link from 'next/link'; // Import Link
+import React, { useState, useEffect } from 'react';
+import { useAuth } from '@/hooks/use-auth';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Card, CardContent } from '@/components/ui/card';
+import {  Share2, Star, Loader2, MessageSquare, Bookmark, Heart } from 'lucide-react';
+import { Textarea } from '@/components/ui/textarea';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import {
-    BookOpen,
-    Eye,
-    List,
-    PlusCircle,
-    CheckCircle,
-    Star,
-    Share2,
-    Send,
-    Loader2,
-    Twitter,
-    Facebook,
-    Copy,
-    MessageSquare,
-    Bookmark,
-    Heart,
-} from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
+import Link from 'next/link';
+import { fetchStoryDetails, submitStoryComment, submitStoryRating } from '@/lib/storyService';
+import { validateCommentData, validateRatingData } from '@/services/validationService';
+
+interface StoryDetailPageProps {
+    slug: string;
+}
+
+interface Comment {
+    user: string;
+    text: string;
+}
+
+const StoryDetailPage: React.FC<StoryDetailPageProps> = ({ slug }) => {
+    const { user } = useAuth();
+    const { toast } = useToast();
+    const [rating, setRating] = useState<number | null>(null);
+    const [isSubmittingRating, setIsSubmittingRating] = useState(false);
+    const [comment, setComment] = useState('');
+    const [comments, setComments] = useState<Comment[]>([]);
+    const [isSubmittingComment, setIsSubmittingComment] = useState(false);
+    const [copySuccess, setCopySuccess] = useState('');
+    const [story, setStory] = useState<any | null>(null);
+    const [isLoading, setIsLoading] = useState<boolean>(true);
+
+    // --- Data Fetching ---
+    useEffect(() => {
+        const fetchStory = async () => {
+            setIsLoading(true);
+            try {
+                const data = await fetchStoryDetails(slug, user?.id);
+                setStory(data);
+                setRating(data?.userRating || 0);
+            } catch (error) {
+                console.error("Error fetching story details:", error);
+                setStory(null);
+                toast({
+                    title: "Error Loading Story",
+                    description: "Could not load story details. Please try again later.",
+                    variant: "destructive",
+                });
+            } finally {
+                setIsLoading(false);
+            }
+        };
+        fetchStory();
+    }, [slug, user?.id, toast]);
+
+  const handleRateStory = async (value) => {
+    if (!user || !story) {
+         if (!user) toast({ title: "Login Required", description: "Please log in to rate.", variant: "destructive" });
+        return;
+    }
+    setIsSubmittingRating(true);
+     const validationError = validateRatingData({ rating: value });
+    if (validationError) {
+        toast({ title: "Validation Error", description: validationError, variant: "destructive" });
+        return;
+    }
+       try {
+        await submitStoryRating({ storyId: story.id, userId: user.id, rating: value });
+        setRating(value);
+        toast({ title: "Rating Submitted", description: `You rated this story ${value} stars.` });
+    } catch (error) {
+        console.error("Error submitting story rating:", error);
+        toast({ title: "Error Submitting Rating", description: "Could not save your rating. Please try again.", variant: "destructive" });
+    } finally {
+        setIsSubmittingRating(false);
+    }
+  };
+
+  const handleCommentSubmit = async () => {
+    if (!user || !comment.trim() || !story) {
+         if (!user) toast({ title: "Login Required", description: "Please log in to comment.", variant: "destructive" });
+        return;
+    }
+    setIsSubmittingComment(true);
+     const validationError = validateCommentData({ text: comment });
+    if (validationError) {
+        toast({ title: "Validation Error", description: validationError, variant: "destructive" });
+        return;
+    }
+     try {
+        const newComment = await submitStoryComment({
+            storyId: story.id,
+            userId: user.id,
+            text: comment,
+        });
+        setComments([...comments, { user: user.name || 'User', text: comment }]);
+        setComment('');
+         toast({ title: "Comment Posted", description: "Your comment has been added." });
+    } catch (error) {
+        console.error("Error submitting story comment:", error);
+        toast({ title: "Error Posting Comment", description: "Could not post your comment. Please try again later.", variant: "destructive" });
+    } finally {
+        setIsSubmittingComment(false);
+    }
+  };
+
+  const handleShare = async () => {
+    try {
+      await navigator.clipboard.writeText(window.location.href);
+      setCopySuccess('Link copied!');
+      setTimeout(() => setCopySuccess(''), 2000);
+    } catch (err) {
+      setCopySuccess('Failed to copy link.');
+    }
+  };
+
+  if (isLoading) {
+    return <div className="text-center py-20 text-xl text-muted-foreground">Loading story...</div>;
+  }
+
+  if (!story) {
+    return <div className="text-center py-20 text-xl text-muted-foreground">Story not found or failed to load.</div>;
+  };
+
+  return (
+    <div className="p-4 max-w-3xl mx-auto">
+      <Card>
+        <CardContent>
+          <h1 className="text-3xl font-bold mb-2">{story?.title}</h1>
+          <p className="text-muted-foreground mb-4">By {story.author}</p>
+          {story.coverImageUrl && (
+            <img
+              src={story.coverImageUrl}
+              alt="Cover"
+              className="w-full rounded-xl mb-4"
+            />
+          )}
+          <p className="mb-4 whitespace-pre-line">{story?.description}</p>
+
+          {/* Rating */}
+          <div className="mb-4">
+            <h3 className="font-semibold mb-2">Rate this story:</h3>
+            <div className="flex items-center space-x-1">
+              {[1, 2, 3, 4, 5].map((val) => (
+                <Button
+                  key={val}
+                  size="icon"
+                  variant={rating === val ? 'default' : 'outline'}
+                  onClick={() => handleRateStory(val)}
+                  disabled={!user || isSubmittingRating}
+                >
+                     {isSubmittingRating && rating === val ? <Loader2 className="h-4 w-4 animate-spin" /> : <Star className="h-4 w-4" />}
+                   
+                </Button>
+              ))}
+            </div>
+          </div>
+
+          {/* Comment */}
+          <div className="mb-4">
+               <h3 className="font-semibold mb-2">Leave a comment:</h3>
+                         {user ? (
+                                <div className="flex gap-4 items-start">
+                                    <Avatar className="mt-1 h-10 w-10">
+                                        <AvatarImage src={user.avatarUrl || undefined} alt={user.name || 'User'} data-ai-hint="user comment avatar" />
+                                        <AvatarFallback>{user.name?.substring(0, 1).toUpperCase() || 'U'}</AvatarFallback>
+                                    </Avatar>
+                                    <div className="flex-1 space-y-2">
+                                    <Textarea
+                                        value={comment}
+                                        onChange={(e) => setComment(e.target.value)}
+                                        disabled={isSubmittingComment}
+                                        placeholder={user ? 'Write a comment...' : 'Log in to comment'}
+                                        className="mb-2"
+                                    />
+                                    <Button
+                                        onClick={handleCommentSubmit}
+                                        disabled={isSubmittingComment || !comment.trim()}
+                                    >
+                                        {isSubmittingComment ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : 'Submit'}
+                                    </Button>
+                                    </div>
+                                </div>
+                         ) : (
+                                <div className="text-center p-6 border border-dashed rounded-md bg-secondary/30">
+                                    <p className="text-muted-foreground">
+                                        <Link href="/login" className="text-primary font-medium hover:underline">Log in</Link> or{' '}
+                                        <Link href="/signup" className="text-primary font-medium hover:underline">Sign up</Link> to leave a comment.
+                                    </p>
+                                </div>
+                            )}
+            <div className="mt-4 space-y-2">
+              {comments.map((c, idx) => (
+                <div key={idx} className="p-2 border rounded">
+                  <p className="text-sm font-medium">{c.user}</p>
+                  <p>{c.text}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Share */}
+          <div className="mb-4">
+            <h3 className="font-semibold mb-2">Share this story:</h3>
+            <Button onClick={handleShare} variant="outline">
+              <Share2 className="h-4 w-4 mr-2" /> Share
+            </Button>
+            {copySuccess && <p className="text-sm text-green-600 mt-2">{copySuccess}</p>}
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+};
+export default StoryDetailPage;
 import Image from 'next/image';
 import { useAuth } from '@/hooks/use-auth';
 import { Textarea } from '@/components/ui/textarea'; // Import Textarea
 import { useToast } from '@/hooks/use-toast';
 import { validateCommentData, validateRatingData } from '@/services/validationService';
-import { StoryDetailsResult, StoryCommentData } from './types';
 import { fetchStoryDetails, submitStoryComment, submitStoryRating, toggleLibraryStatus } from '@/lib/storyService'; // Import services
+import { StoryDetailsResult, StoryCommentData } from './types';
 
 interface StoryDetailPageProps {
     slug: string;
@@ -49,7 +240,7 @@ const StoryDetailPage: React.FC<StoryDetailPageProps> = ({ slug }) => {
     const [isSubmittingComment, setIsSubmittingComment] = useState(false);
     const [isSubmittingRating, setIsSubmittingRating] = useState(false);
     const [isTogglingLibrary, setIsTogglingLibrary] = useState(false);
-    const [comments, setComments] = useState<StoryCommentData[]>([]);
+    const [comments, setComments] = useState<StoryCommentData[]>([]); // Use StoryCommentData here
 
     // --- Data Fetching ---
     useEffect(() => {
@@ -510,7 +701,57 @@ const StoryDetailLoader: React.FC = () => (
                    <Card><CardContent className="p-4 space-y-3"><Skeleton className="h-5 w-full" /><Skeleton className="h-5 w-full" /><Skeleton className="h-5 w-full" /></CardContent></Card>
                    <Card><CardHeader className="p-4 pb-2"><Skeleton className="h-6 w-1/2" /></CardHeader><CardContent className="p-4 pt-0"><div className="flex flex-wrap gap-2"><Skeleton className="h-5 w-16" /><Skeleton className="h-5 w-20" /><Skeleton className="h-5 w-14" /></div></CardContent></Card>
                </aside>
-              <main className="md:col-span-8 lg:col-span-9 space-y-8">
+              <main className="md:col-import type { Timestamp } from 'firebase/firestore';
+
+export interface StoryCommentData {
+    id: string;
+    userId: string;
+    userName: string;
+    userAvatar?: string | null;
+    text: string;
+    timestamp: Date;
+}
+
+interface Author {
+    name: string;
+    id: string;
+    avatarUrl?: string;
+}
+
+interface ChapterSummary {
+    id: string;
+    title: string;
+    order: number;
+    wordCount?: number;
+    lastUpdated?: string; // ISO string
+}
+
+export interface StoryDetailsResult {
+    id: string;
+    title: string;
+    description: string;
+    genre: string;
+    tags: string[];
+    status: 'Draft' | 'Published' | 'Archived' | 'Ongoing' | 'Completed';
+    authorId: string;
+    authorName: string; // Ensure this is fetched
+    coverImageUrl?: string;
+    reads?: number;
+    author: Author;
+    authorFollowers: number;
+    chapters: number; // Explicit chapters count
+    chaptersData: ChapterSummary[];
+    lastUpdated: string; // ISO string for consistency
+    averageRating?: number;
+    totalRatings?: number;
+    comments?: StoryCommentData[];
+    userRating?: number;
+    isInLibrary?: boolean;
+    slug: string;
+    dataAiHint?: string;
+    // Ensure all fields from src/types Story are here or correctly mapped
+}
+span-8 lg:col-span-9 space-y-8">
                   <Card><CardHeader><Skeleton className="h-6 w-1/4" /></CardHeader><CardContent><Skeleton className="h-20 w-full" /></CardContent></Card>
                   <Card><CardHeader><Skeleton className="h-6 w-1/4" /></CardHeader><CardContent className="flex items-center gap-4"><Skeleton className="h-16 w-16 rounded-full" /><div className="space-y-2"><Skeleton className="h-5 w-32" /><Skeleton className="h-4 w-24" /></div></CardContent></Card>
                    <Card><CardHeader><Skeleton className="h-6 w-1/3" /></CardHeader><CardContent className="space-y-2"><Skeleton className="h-10 w-full" /><Skeleton className="h-10 w-full" /><Skeleton className="h-10 w-full" /></CardContent></Card>
