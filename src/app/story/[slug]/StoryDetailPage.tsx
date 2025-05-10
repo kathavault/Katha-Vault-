@@ -1,47 +1,97 @@
-import React, { useState, useEffect } from 'react';
-import { useAuth } from '@/hooks/use-auth';
+// src/app/story/[slug]/StoryDetailPage.tsx
+'use client';
+
+import React, { useState, useEffect, Suspense } from 'react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Card, CardContent } from '@/components/ui/card';
-import {  Share2, Star, Loader2, MessageSquare, Bookmark, Heart } from 'lucide-react';
-import { Textarea } from '@/components/ui/textarea';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
-import { fetchStoryDetails, submitStoryComment, submitStoryRating } from '@/lib/storyService';
+import Image from 'next/image';
+import { useAuth } from '@/hooks/use-auth';
+import { Textarea } from '@/components/ui/textarea';
+import { useToast } from '@/hooks/use-toast';
 import { validateCommentData, validateRatingData } from '@/services/validationService';
+import { fetchStoryDetails, submitStoryComment, submitStoryRating, toggleLibraryStatus } from '@/lib/storyService';
+import type { StoryDetailsResult, StoryCommentData, Author as StoryAuthor, ChapterSummary as StoryChapterSummary } from '@/app/story/[slug]/types';
+import { Separator } from '@/components/ui/separator';
+import { Badge } from '@/components/ui/badge';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Twitter, Facebook, Copy, Share2, BookOpen, CheckCircle, Bookmark, Eye, List, Star, MessageSquare, Send, Loader2 } from 'lucide-react';
+
 
 interface StoryDetailPageProps {
     slug: string;
 }
 
-interface Comment {
-    user: string;
-    text: string;
-}
+// Renamed Skeleton Loader Component
+const StoryDetailsSkeleton: React.FC = () => (
+    <div className="container mx-auto py-6 md:py-10 animate-pulse">
+        <section className="mb-8 md:mb-12 text-center space-y-3">
+            <Skeleton className="h-10 w-3/4 mx-auto bg-muted" />
+            <Skeleton className="h-6 w-1/4 mx-auto bg-muted" />
+        </section>
+         <section className="mb-8 md:mb-12 flex justify-center">
+            <Skeleton className="w-full max-w-xs sm:max-w-sm md:max-w-md aspect-[2/3] rounded-lg bg-muted" />
+         </section>
+         <section className="mb-8 md:mb-12 flex flex-col items-center gap-4">
+              <Skeleton className="h-10 w-48 bg-muted" />
+               <div className="flex gap-3">
+                   <Skeleton className="h-8 w-24 bg-muted" />
+                   <Skeleton className="h-8 w-24 bg-muted" />
+                   <Skeleton className="h-8 w-24 bg-muted" />
+               </div>
+          </section>
+
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-6 md:gap-8">
+              <aside className="md:col-span-4 lg:col-span-3 space-y-6">
+                  <div className="space-y-3 sticky top-20">
+                      <Skeleton className="h-12 w-full bg-muted" />
+                      <Skeleton className="h-12 w-full bg-muted" />
+                  </div>
+                   <Card className="bg-muted/50"><CardContent className="p-4 space-y-3"><Skeleton className="h-5 w-full bg-muted" /><Skeleton className="h-5 w-full bg-muted" /><Skeleton className="h-5 w-full bg-muted" /></CardContent></Card>
+                   <Card className="bg-muted/50"><CardHeader className="p-4 pb-2"><Skeleton className="h-6 w-1/2 bg-muted" /></CardHeader><CardContent className="p-4 pt-0"><div className="flex flex-wrap gap-2"><Skeleton className="h-5 w-16 bg-muted" /><Skeleton className="h-5 w-20 bg-muted" /><Skeleton className="h-5 w-14 bg-muted" /></div></CardContent></Card>
+               </aside>
+              <main className="md:col-span-8 lg:col-span-9 space-y-8">
+                  <Card className="bg-muted/50"><CardHeader><Skeleton className="h-6 w-1/4 bg-muted" /></CardHeader><CardContent><Skeleton className="h-20 w-full bg-muted" /></CardContent></Card>
+                  <Card className="bg-muted/50"><CardHeader><Skeleton className="h-6 w-1/4 bg-muted" /></CardHeader><CardContent className="flex items-center gap-4"><Skeleton className="h-16 w-16 rounded-full bg-muted" /><div className="space-y-2"><Skeleton className="h-5 w-32 bg-muted" /><Skeleton className="h-4 w-24 bg-muted" /></div></CardContent></Card>
+                   <Card className="bg-muted/50"><CardHeader><Skeleton className="h-6 w-1/3 bg-muted" /></CardHeader><CardContent className="space-y-2"><Skeleton className="h-10 w-full bg-muted" /><Skeleton className="h-10 w-full bg-muted" /><Skeleton className="h-10 w-full bg-muted" /></CardContent></Card>
+                   <Card className="bg-muted/50"><CardHeader><Skeleton className="h-6 w-1/4 bg-muted" /></CardHeader><CardContent className="space-y-4"><Skeleton className="h-24 w-full bg-muted" /><Skeleton className="h-10 w-full bg-muted" /><Skeleton className="h-10 w-full bg-muted" /></CardContent></Card>
+               </main>
+          </div>
+     </div>
+ );
+StoryDetailsSkeleton.displayName = 'StoryDetailsSkeleton';
+
 
 const StoryDetailPage: React.FC<StoryDetailPageProps> = ({ slug }) => {
-    const { user } = useAuth();
+    const { user, isLoading: authLoading } = useAuth();
     const { toast } = useToast();
-    const [rating, setRating] = useState<number | null>(null);
-    const [isSubmittingRating, setIsSubmittingRating] = useState(false);
-    const [comment, setComment] = useState('');
-    const [comments, setComments] = useState<Comment[]>([]);
+    const [story, setStory] = useState<StoryDetailsResult | null>(null);
+    const [isLoading, setIsLoading] = useState(true);
+    const [commentText, setCommentText] = useState('');
+    const [rating, setRating] = useState(0);
+    const [isInLibrary, setIsInLibrary] = useState(false);
     const [isSubmittingComment, setIsSubmittingComment] = useState(false);
-    const [copySuccess, setCopySuccess] = useState('');
-    const [story, setStory] = useState<any | null>(null);
-    const [isLoading, setIsLoading] = useState<boolean>(true);
+    const [isSubmittingRating, setIsSubmittingRating] = useState(false);
+    const [isTogglingLibrary, setIsTogglingLibrary] = useState(false);
+    const [comments, setComments] = useState<StoryCommentData[]>([]);
 
-    // --- Data Fetching ---
     useEffect(() => {
-        const fetchStory = async () => {
+        const fetchAndSetStoryDetails = async () => {
+            if (!slug) {
+                console.warn("Slug is not available yet.");
+                setIsLoading(false);
+                return;
+            }
             setIsLoading(true);
             try {
                 const data = await fetchStoryDetails(slug, user?.id);
                 setStory(data);
                 setRating(data?.userRating || 0);
+                setIsInLibrary(data?.isInLibrary || false);
+                setComments(data?.comments || []);
             } catch (error) {
-                console.error("Error fetching story details:", error);
+                console.error("Error fetching story details in component:", error);
                 setStory(null);
                 toast({
                     title: "Error Loading Story",
@@ -52,226 +102,12 @@ const StoryDetailPage: React.FC<StoryDetailPageProps> = ({ slug }) => {
                 setIsLoading(false);
             }
         };
-        fetchStory();
-    }, [slug, user?.id, toast]);
 
-  const handleRateStory = async (value) => {
-    if (!user || !story) {
-         if (!user) toast({ title: "Login Required", description: "Please log in to rate.", variant: "destructive" });
-        return;
-    }
-    setIsSubmittingRating(true);
-     const validationError = validateRatingData({ rating: value });
-    if (validationError) {
-        toast({ title: "Validation Error", description: validationError, variant: "destructive" });
-        return;
-    }
-       try {
-        await submitStoryRating({ storyId: story.id, userId: user.id, rating: value });
-        setRating(value);
-        toast({ title: "Rating Submitted", description: `You rated this story ${value} stars.` });
-    } catch (error) {
-        console.error("Error submitting story rating:", error);
-        toast({ title: "Error Submitting Rating", description: "Could not save your rating. Please try again.", variant: "destructive" });
-    } finally {
-        setIsSubmittingRating(false);
-    }
-  };
+        if (!authLoading) {
+            fetchAndSetStoryDetails();
+        }
+    }, [slug, user?.id, toast, authLoading]);
 
-  const handleCommentSubmit = async () => {
-    if (!user || !comment.trim() || !story) {
-         if (!user) toast({ title: "Login Required", description: "Please log in to comment.", variant: "destructive" });
-        return;
-    }
-    setIsSubmittingComment(true);
-     const validationError = validateCommentData({ text: comment });
-    if (validationError) {
-        toast({ title: "Validation Error", description: validationError, variant: "destructive" });
-        return;
-    }
-     try {
-        const newComment = await submitStoryComment({
-            storyId: story.id,
-            userId: user.id,
-            text: comment,
-        });
-        setComments([...comments, { user: user.name || 'User', text: comment }]);
-        setComment('');
-         toast({ title: "Comment Posted", description: "Your comment has been added." });
-    } catch (error) {
-        console.error("Error submitting story comment:", error);
-        toast({ title: "Error Posting Comment", description: "Could not post your comment. Please try again later.", variant: "destructive" });
-    } finally {
-        setIsSubmittingComment(false);
-    }
-  };
-
-  const handleShare = async () => {
-    try {
-      await navigator.clipboard.writeText(window.location.href);
-      setCopySuccess('Link copied!');
-      setTimeout(() => setCopySuccess(''), 2000);
-    } catch (err) {
-      setCopySuccess('Failed to copy link.');
-    }
-  };
-
-  if (isLoading) {
-    return <div className="text-center py-20 text-xl text-muted-foreground">Loading story...</div>;
-  }
-
-  if (!story) {
-    return <div className="text-center py-20 text-xl text-muted-foreground">Story not found or failed to load.</div>;
-  };
-
-  return (
-    <div className="p-4 max-w-3xl mx-auto">
-      <Card>
-        <CardContent>
-          <h1 className="text-3xl font-bold mb-2">{story?.title}</h1>
-          <p className="text-muted-foreground mb-4">By {story.author}</p>
-          {story.coverImageUrl && (
-            <img
-              src={story.coverImageUrl}
-              alt="Cover"
-              className="w-full rounded-xl mb-4"
-            />
-          )}
-          <p className="mb-4 whitespace-pre-line">{story?.description}</p>
-
-          {/* Rating */}
-          <div className="mb-4">
-            <h3 className="font-semibold mb-2">Rate this story:</h3>
-            <div className="flex items-center space-x-1">
-              {[1, 2, 3, 4, 5].map((val) => (
-                <Button
-                  key={val}
-                  size="icon"
-                  variant={rating === val ? 'default' : 'outline'}
-                  onClick={() => handleRateStory(val)}
-                  disabled={!user || isSubmittingRating}
-                >
-                     {isSubmittingRating && rating === val ? <Loader2 className="h-4 w-4 animate-spin" /> : <Star className="h-4 w-4" />}
-                   
-                </Button>
-              ))}
-            </div>
-          </div>
-
-          {/* Comment */}
-          <div className="mb-4">
-               <h3 className="font-semibold mb-2">Leave a comment:</h3>
-                         {user ? (
-                                <div className="flex gap-4 items-start">
-                                    <Avatar className="mt-1 h-10 w-10">
-                                        <AvatarImage src={user.avatarUrl || undefined} alt={user.name || 'User'} data-ai-hint="user comment avatar" />
-                                        <AvatarFallback>{user.name?.substring(0, 1).toUpperCase() || 'U'}</AvatarFallback>
-                                    </Avatar>
-                                    <div className="flex-1 space-y-2">
-                                    <Textarea
-                                        value={comment}
-                                        onChange={(e) => setComment(e.target.value)}
-                                        disabled={isSubmittingComment}
-                                        placeholder={user ? 'Write a comment...' : 'Log in to comment'}
-                                        className="mb-2"
-                                    />
-                                    <Button
-                                        onClick={handleCommentSubmit}
-                                        disabled={isSubmittingComment || !comment.trim()}
-                                    >
-                                        {isSubmittingComment ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : 'Submit'}
-                                    </Button>
-                                    </div>
-                                </div>
-                         ) : (
-                                <div className="text-center p-6 border border-dashed rounded-md bg-secondary/30">
-                                    <p className="text-muted-foreground">
-                                        <Link href="/login" className="text-primary font-medium hover:underline">Log in</Link> or{' '}
-                                        <Link href="/signup" className="text-primary font-medium hover:underline">Sign up</Link> to leave a comment.
-                                    </p>
-                                </div>
-                            )}
-            <div className="mt-4 space-y-2">
-              {comments.map((c, idx) => (
-                <div key={idx} className="p-2 border rounded">
-                  <p className="text-sm font-medium">{c.user}</p>
-                  <p>{c.text}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Share */}
-          <div className="mb-4">
-            <h3 className="font-semibold mb-2">Share this story:</h3>
-            <Button onClick={handleShare} variant="outline">
-              <Share2 className="h-4 w-4 mr-2" /> Share
-            </Button>
-            {copySuccess && <p className="text-sm text-green-600 mt-2">{copySuccess}</p>}
-          </div>
-        </CardContent>
-      </Card>
-    </div>
-  );
-};
-export default StoryDetailPage;
-import Image from 'next/image';
-import { useAuth } from '@/hooks/use-auth';
-import { Textarea } from '@/components/ui/textarea'; // Import Textarea
-import { useToast } from '@/hooks/use-toast';
-import { validateCommentData, validateRatingData } from '@/services/validationService';
-import { fetchStoryDetails, submitStoryComment, submitStoryRating, toggleLibraryStatus } from '@/lib/storyService'; // Import services
-import { StoryDetailsResult, StoryCommentData } from './types';
-
-interface StoryDetailPageProps {
-    slug: string;
-}
-
-const StoryDetailPage: React.FC<StoryDetailPageProps> = ({ slug }) => {
-    // --- Hooks and State ---
-
-    const { user, isLoading: authLoading } = useAuth(); // Removed unused authLoading
-    const { toast } = useToast();
-    const [story, setStory] = useState<StoryDetailsResult | null>(null);
-    const [isLoading, setIsLoading] = useState(true);
-    const [commentText, setCommentText] = useState('');
-    const [rating, setRating] = useState(0);
-    const [isInLibrary, setIsInLibrary] = useState(false);
-    const [isSubmittingComment, setIsSubmittingComment] = useState(false);
-    const [isSubmittingRating, setIsSubmittingRating] = useState(false);
-    const [isTogglingLibrary, setIsTogglingLibrary] = useState(false);
-    const [comments, setComments] = useState<StoryCommentData[]>([]); // Use StoryCommentData here
-
-    // --- Data Fetching ---
-    useEffect(() => {
-        const fetchStory = async () => {
-            setIsLoading(true);
-            try {
-                // Pass userId if available to check library status and user rating
-                const data = await fetchStoryDetails(slug, user?.id);
-                setStory(data);
-                setRating(data?.userRating || 0);
-                setIsInLibrary(data?.isInLibrary || false);
-                setComments(data?.comments || []);
-            } catch (error) {
-                console.error("Error fetching story details:", error);
-                setStory(null);
-                toast({ // Add toast on fetch error
-                    title: "Error Loading Story",
-                    description: "Could not load story details. Please try again later.",
-                    variant: "destructive",
-                });
-            } finally {
-                setIsLoading(false);
-            }
-        };
-         if (!authLoading) { // Fetch only when auth state is resolved
-              fetchStory();
-         }
-    }, [slug, user?.id, toast, authLoading]); // Added authLoading dependency
-
-
-    // --- Handlers ---
     const handleCommentSubmit = async () => {
         if (!user || !story) {
             toast({ title: "Login Required", description: "Please log in to leave a comment.", variant: "destructive" });
@@ -289,17 +125,16 @@ const StoryDetailPage: React.FC<StoryDetailPageProps> = ({ slug }) => {
                 userId: user.id,
                 text: commentText,
             });
-            // Optimistically update comments state
             setComments(prevComments => [{
                 id: newComment.id,
                 userId: user.id,
-                userName: user.name || 'User', // Use display name or fallback
+                userName: user.name || 'User',
                 userAvatar: user.avatarUrl,
                 text: commentText,
-                timestamp: new Date() // Use client time for immediate feedback
+                timestamp: new Date()
             }, ...prevComments]);
             toast({ title: "Comment Posted", description: "Your comment has been added." });
-            setCommentText(''); // Clear input field
+            setCommentText('');
         } catch (error) {
             console.error("Error submitting story comment:", error);
             toast({ title: "Error Posting Comment", description: "Could not post your comment. Please try again later.", variant: "destructive" });
@@ -320,7 +155,7 @@ const StoryDetailPage: React.FC<StoryDetailPageProps> = ({ slug }) => {
         }
         setIsSubmittingRating(true);
         const previousRating = rating;
-        setRating(newRating); // Optimistic update
+        setRating(newRating);
         try {
             await submitStoryRating({
                 storyId: story.id,
@@ -328,19 +163,18 @@ const StoryDetailPage: React.FC<StoryDetailPageProps> = ({ slug }) => {
                 rating: newRating,
             });
             toast({ title: "Rating Submitted", description: `You rated this story ${newRating} stars.` });
-            // Optionally re-fetch story details to update average rating display accurately
-             fetchStoryDetails(slug, user?.id).then(data => { if(data) setStory(data); }); // Re-fetch to update average
+            fetchStoryDetails(slug, user?.id).then(data => { if(data) setStory(data); });
         } catch (error) {
             console.error("Error submitting story rating:", error);
             toast({ title: "Error Submitting Rating", description: "Could not save your rating. Please try again.", variant: "destructive" });
-            setRating(previousRating); // Revert optimistic update on error
+            setRating(previousRating);
         } finally {
             setIsSubmittingRating(false);
         }
     };
 
     const handleCopyUrl = () => {
-        if (!story) return;
+        if (!story || typeof window === 'undefined') return;
         const storyUrl = window.location.href;
         navigator.clipboard.writeText(storyUrl)
             .then(() => toast({ title: "Copied!", description: "Story URL copied to clipboard." }))
@@ -355,6 +189,8 @@ const StoryDetailPage: React.FC<StoryDetailPageProps> = ({ slug }) => {
             toast({ title: "Error", description: "Story not available.", variant: "destructive" });
             return;
         }
+        if (typeof window === 'undefined') return; // Ensure window context
+
         const url = window.location.href;
         const text = `Check out "${story.title}" by ${story.author.name} on Katha Vault!`;
 
@@ -368,7 +204,7 @@ const StoryDetailPage: React.FC<StoryDetailPageProps> = ({ slug }) => {
                 await navigator.share({ title: story.title, text: text, url: url });
             } catch (error) {
                 console.error("Web Share API error:", error);
-                handleCopyUrl(); // Fallback to copy link
+                handleCopyUrl();
             }
         } else {
             let shareUrl = '';
@@ -380,7 +216,7 @@ const StoryDetailPage: React.FC<StoryDetailPageProps> = ({ slug }) => {
             if (shareUrl) {
                 window.open(shareUrl, '_blank', 'noopener,noreferrer');
             } else {
-                handleCopyUrl(); // Default to copy link if platform not matched
+                handleCopyUrl();
             }
         }
     };
@@ -392,24 +228,22 @@ const StoryDetailPage: React.FC<StoryDetailPageProps> = ({ slug }) => {
         }
         setIsTogglingLibrary(true);
         const previousLibraryStatus = isInLibrary;
-        setIsInLibrary(!isInLibrary); // Optimistic update
+        setIsInLibrary(!isInLibrary);
         try {
             await toggleLibraryStatus(user.id, story.id, !previousLibraryStatus);
             toast({ title: `Story ${!previousLibraryStatus ? 'Added To' : 'Removed From'} Library` });
         } catch (error) {
             console.error("Error toggling library status:", error);
             toast({ title: "Library Error", description: "Could not update your library. Please try again.", variant: "destructive" });
-            setIsInLibrary(previousLibraryStatus); // Revert on error
+            setIsInLibrary(previousLibraryStatus);
         } finally {
             setIsTogglingLibrary(false);
         }
     };
 
-    // --- Render Logic ---
-    if (isLoading || authLoading) { // Use the specific loading state for story data + auth
-        return <StoryDetailLoader />; // Show skeleton loader
+    if (isLoading || authLoading) {
+        return <StoryDetailsSkeleton />;
     }
-
 
     if (!story) {
         return <div className="text-center py-20 text-xl text-muted-foreground">Story not found or failed to load.</div>;
@@ -417,11 +251,8 @@ const StoryDetailPage: React.FC<StoryDetailPageProps> = ({ slug }) => {
 
     const displayRating = story.averageRating ? story.averageRating.toFixed(1) : 'N/A';
 
-    // Removed dilKeRaasteSummary definition
-
     return (
         <div className="container mx-auto py-6 md:py-10">
-            {/* Header Section - Title and Author */}
             <section className="mb-8 md:mb-12 text-center">
                 <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold leading-tight text-foreground mb-2">{story.title}</h1>
                 <div className="text-lg text-muted-foreground">
@@ -429,25 +260,21 @@ const StoryDetailPage: React.FC<StoryDetailPageProps> = ({ slug }) => {
                 </div>
             </section>
 
-            {/* Cover Image Section */}
             <section className="mb-8 md:mb-12 flex justify-center">
                 <div className="relative w-full max-w-xs sm:max-w-sm md:max-w-md aspect-[2/3] overflow-hidden rounded-lg shadow-lg border border-border/80">
                     <Image
-                        src={story.slug === 'dil-ke-raaste' ? 'https://i.imgur.com/F6H94Zd.png' : (story.coverImageUrl || `https://picsum.photos/seed/${story.slug}/400/600`)} // Conditional image for Dil Ke Raaste
+                        src={story.slug === 'dil-ke-raaste' ? 'https://i.imgur.com/F6H94Zd.png' : (story.coverImageUrl || `https://picsum.photos/seed/${story.slug}/400/600`)}
                         alt={`Cover for ${story.title}`}
                         fill
                         sizes="(max-width: 640px) 80vw, (max-width: 768px) 40vw, 33vw"
                         className="object-cover"
-                        priority // Consider making this dynamic if needed
+                        priority
                         data-ai-hint={story.dataAiHint || "book cover story detail large"}
                     />
                 </div>
             </section>
 
-
-            {/* Rating and Social Share (Added below image) */}
             <section className="mb-8 md:mb-12 flex flex-col items-center gap-4">
-                {/* Story Rating */}
                   <div className="flex items-center gap-1 pt-1">
                       {[1, 2, 3, 4, 5].map((starVal) => (
                            <Button
@@ -465,20 +292,17 @@ const StoryDetailPage: React.FC<StoryDetailPageProps> = ({ slug }) => {
                    </div>
                    {!user && <p className="text-sm text-muted-foreground"><Link href="/login" className="text-primary underline">Log in</Link> to rate.</p>}
 
-                   {/* Share Section */}
                    <div className="flex flex-wrap justify-center gap-3">
                        <Button variant="outline" size="sm" onClick={() => handleShareStory('twitter')}><Twitter className="mr-2 h-4 w-4"/> Twitter/X</Button>
                        <Button variant="outline" size="sm" onClick={() => handleShareStory('facebook')}><Facebook className="mr-2 h-4 w-4"/> Facebook</Button>
                        <Button variant="outline" size="sm" onClick={() => handleShareStory('copy')}><Copy className="mr-2 h-4 w-4"/> Copy Link</Button>
-                       {typeof window !== 'undefined' && navigator.share && ( // Check if navigator is available
+                       {typeof window !== 'undefined' && navigator.share && (
                            <Button variant="outline" size="sm" onClick={() => handleShareStory('web')}><Share2 className="mr-2 h-4 w-4" /> More...</Button>
                        )}
                    </div>
             </section>
 
-            {/* Main Layout Grid */}
             <div className="grid grid-cols-1 md:grid-cols-12 gap-6 md:gap-8">
-                {/* Left Column: Actions, Meta */}
                 <aside className="md:col-span-4 lg:col-span-3 space-y-6">
                     <div className="space-y-3 sticky top-20">
                         <Button size="lg" asChild className="w-full bg-primary text-primary-foreground hover:bg-primary/90 text-base font-semibold shadow-md">
@@ -501,7 +325,6 @@ const StoryDetailPage: React.FC<StoryDetailPageProps> = ({ slug }) => {
                         </Button>
                     </div>
 
-                    {/* Story Stats */}
                      <Card>
                         <CardContent className="p-4 space-y-2 text-sm">
                              <div className="flex items-center justify-between">
@@ -533,7 +356,6 @@ const StoryDetailPage: React.FC<StoryDetailPageProps> = ({ slug }) => {
                          </CardContent>
                      </Card>
 
-                    {/* Tags */}
                     {story.tags && story.tags.length > 0 && (
                         <Card>
                             <CardHeader className="p-4 pb-2"><CardTitle className="text-base font-semibold">Tags</CardTitle></CardHeader>
@@ -552,17 +374,14 @@ const StoryDetailPage: React.FC<StoryDetailPageProps> = ({ slug }) => {
                     )}
                 </aside>
 
-                {/* Right Column: Summary, Chapters, Author, Comments */}
                 <main className="md:col-span-8 lg:col-span-9 space-y-8">
                     <Card>
                         <CardHeader><CardTitle className="text-xl font-semibold">Story Summary</CardTitle></CardHeader>
                         <CardContent className="prose dark:prose-invert max-w-none">
-                            {/* Removed conditional rendering for Dil Ke Raaste summary */}
                              <p className="text-base leading-relaxed whitespace-pre-line">{story.description}</p>
                         </CardContent>
                     </Card>
 
-                    {/* Author Card */}
                     <Card>
                         <CardHeader>
                             <CardTitle className="text-xl font-semibold">About the Author</CardTitle>
@@ -577,7 +396,6 @@ const StoryDetailPage: React.FC<StoryDetailPageProps> = ({ slug }) => {
                             <div>
                                 <Link href={`/profile/${story.author.id}`} className="text-lg font-semibold text-primary hover:underline">{story.author.name}</Link>
                                 <p className="text-sm text-muted-foreground">{story.authorFollowers?.toLocaleString() || 0} Followers</p>
-                                {/* <Button variant="outline" size="sm" className="mt-2"><Heart className="mr-2 h-4 w-4"/> Follow (Soon)</Button> */}
                             </div>
                         </CardContent>
                     </Card>
@@ -591,7 +409,7 @@ const StoryDetailPage: React.FC<StoryDetailPageProps> = ({ slug }) => {
                         <CardContent className="p-0 max-h-[400px] overflow-y-auto">
                             <ul className="divide-y">
                                 {story.chaptersData.length > 0 ? (
-                                  story.chaptersData.map((chapter, index) => (
+                                  story.chaptersData.map((chapter) => (
                                     <li key={chapter.id}>
                                         <Link href={`/read/${slug}/${chapter.order}`} className="flex justify-between items-center p-4 hover:bg-secondary/50 transition-colors duration-150 group">
                                             <span className="font-medium group-hover:text-primary">{chapter.order}. {chapter.title}</span>
@@ -606,8 +424,6 @@ const StoryDetailPage: React.FC<StoryDetailPageProps> = ({ slug }) => {
                         </CardContent>
                     </Card>
 
-
-                     {/* Story Comments */}
                     <Card>
                         <CardHeader className="border-b">
                             <CardTitle className="flex items-center gap-2 text-xl font-semibold">
@@ -643,8 +459,8 @@ const StoryDetailPage: React.FC<StoryDetailPageProps> = ({ slug }) => {
                                 </div>
                             )}
                             <div className="space-y-5">
-                                {comments.length === 0 && !user && (
-                                    <p className="text-center text-sm text-muted-foreground italic py-4">No comments yet.</p>
+                                {comments.length === 0 && !user && ( // Check if user is logged in to show "No comments yet" vs "Log in to see comments"
+                                    <p className="text-center text-sm text-muted-foreground italic py-4">No comments yet. Be the first to share your thoughts!</p>
                                 )}
                                 {comments.length > 0 && comments.map((comment) => (
                                    <div key={comment.id} className="flex gap-3 items-start">
@@ -666,101 +482,11 @@ const StoryDetailPage: React.FC<StoryDetailPageProps> = ({ slug }) => {
                            </div>
                        </CardContent>
                    </Card>
-
                 </main>
-            </div></div>
+            </div>
+        </div>
     );
 };
 
-
-// Define StoryDetailLoader component
-const StoryDetailLoader: React.FC = () => (
-    <div className="container mx-auto py-6 md:py-10">
-        <section className="mb-8 md:mb-12 text-center space-y-3">
-            <Skeleton className="h-10 w-3/4 mx-auto" />
-            <Skeleton className="h-6 w-1/4 mx-auto" />
-        </section>
-         <section className="mb-8 md:mb-12 flex justify-center">
-            <Skeleton className="w-full max-w-xs sm:max-w-sm md:max-w-md aspect-[2/3] rounded-lg" />
-         </section>
-         <section className="mb-8 md:mb-12 flex flex-col items-center gap-4">
-              <Skeleton className="h-10 w-48" />
-               <div className="flex gap-3">
-                   <Skeleton className="h-8 w-24" />
-                   <Skeleton className="h-8 w-24" />
-                   <Skeleton className="h-8 w-24" />
-               </div>
-          </section>
-
-          <div className="grid grid-cols-1 md:grid-cols-12 gap-6 md:gap-8">
-              <aside className="md:col-span-4 lg:col-span-3 space-y-6">
-                  <div className="space-y-3 sticky top-20">
-                      <Skeleton className="h-12 w-full" />
-                      <Skeleton className="h-12 w-full" />
-                  </div>
-                   <Card><CardContent className="p-4 space-y-3"><Skeleton className="h-5 w-full" /><Skeleton className="h-5 w-full" /><Skeleton className="h-5 w-full" /></CardContent></Card>
-                   <Card><CardHeader className="p-4 pb-2"><Skeleton className="h-6 w-1/2" /></CardHeader><CardContent className="p-4 pt-0"><div className="flex flex-wrap gap-2"><Skeleton className="h-5 w-16" /><Skeleton className="h-5 w-20" /><Skeleton className="h-5 w-14" /></div></CardContent></Card>
-               </aside>
-              <main className="md:col-import type { Timestamp } from 'firebase/firestore';
-
-export interface StoryCommentData {
-    id: string;
-    userId: string;
-    userName: string;
-    userAvatar?: string | null;
-    text: string;
-    timestamp: Date;
-}
-
-interface Author {
-    name: string;
-    id: string;
-    avatarUrl?: string;
-}
-
-interface ChapterSummary {
-    id: string;
-    title: string;
-    order: number;
-    wordCount?: number;
-    lastUpdated?: string; // ISO string
-}
-
-export interface StoryDetailsResult {
-    id: string;
-    title: string;
-    description: string;
-    genre: string;
-    tags: string[];
-    status: 'Draft' | 'Published' | 'Archived' | 'Ongoing' | 'Completed';
-    authorId: string;
-    authorName: string; // Ensure this is fetched
-    coverImageUrl?: string;
-    reads?: number;
-    author: Author;
-    authorFollowers: number;
-    chapters: number; // Explicit chapters count
-    chaptersData: ChapterSummary[];
-    lastUpdated: string; // ISO string for consistency
-    averageRating?: number;
-    totalRatings?: number;
-    comments?: StoryCommentData[];
-    userRating?: number;
-    isInLibrary?: boolean;
-    slug: string;
-    dataAiHint?: string;
-    // Ensure all fields from src/types Story are here or correctly mapped
-}
-span-8 lg:col-span-9 space-y-8">
-                  <Card><CardHeader><Skeleton className="h-6 w-1/4" /></CardHeader><CardContent><Skeleton className="h-20 w-full" /></CardContent></Card>
-                  <Card><CardHeader><Skeleton className="h-6 w-1/4" /></CardHeader><CardContent className="flex items-center gap-4"><Skeleton className="h-16 w-16 rounded-full" /><div className="space-y-2"><Skeleton className="h-5 w-32" /><Skeleton className="h-4 w-24" /></div></CardContent></Card>
-                   <Card><CardHeader><Skeleton className="h-6 w-1/3" /></CardHeader><CardContent className="space-y-2"><Skeleton className="h-10 w-full" /><Skeleton className="h-10 w-full" /><Skeleton className="h-10 w-full" /></CardContent></Card>
-                   <Card><CardHeader><Skeleton className="h-6 w-1/4" /></CardHeader><CardContent className="space-y-4"><Skeleton className="h-24 w-full" /><Skeleton className="h-10 w-full" /><Skeleton className="h-10 w-full" /></CardContent></Card>
-               </main>
-          </div>
-     </div>
- );
-
-
 export default StoryDetailPage;
-export { StoryDetailLoader }; // Export the loader
+export { StoryDetailsSkeleton };
