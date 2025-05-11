@@ -5,7 +5,7 @@ name: Deploy static content to Pages
 on:
   # Runs on pushes targeting the default branch
   push:
-    branches: ["main"] # Or your default branch
+    branches: ["main"] # Ensure this is your default branch
 
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
@@ -36,19 +36,8 @@ jobs:
           cache: 'npm'
       - name: Install dependencies
         run: npm ci
-      # Add environment variables needed for the build process
-      # Ensure these are configured as secrets in your GitHub repository settings if needed during EXPORT time
       - name: Build project for static export
         run: |
-          # Export NEXT_PUBLIC variables needed during build/export time
-          # Note: These are used during the build, not runtime on GitHub Pages
-          # You MUST set these as environment variables in the Vercel/GitHub Actions settings if they are required
-          # Example:
-          # export NEXT_PUBLIC_FIREBASE_API_KEY=${{ vars.NEXT_PUBLIC_FIREBASE_API_KEY }}
-          # export NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=${{ vars.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN }}
-          # ... add others if needed for the STATIC export build ...
-
-          # Default values if vars aren't set (useful for local testing or basic deployments)
           export NEXT_PUBLIC_FIREBASE_API_KEY=${NEXT_PUBLIC_FIREBASE_API_KEY:-AIzaSyDT4-R0H8uydAqzrTsHfMKLXQ59p7u67Ho}
           export NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=${NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN:-katha-vault-novel.firebaseapp.com}
           export NEXT_PUBLIC_FIREBASE_PROJECT_ID=${NEXT_PUBLIC_FIREBASE_PROJECT_ID:-katha-vault-novel}
@@ -56,11 +45,8 @@ jobs:
           export NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=${NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID:-1050410197456}
           export NEXT_PUBLIC_FIREBASE_APP_ID=${NEXT_PUBLIC_FIREBASE_APP_ID:-1:1050410197456:web:3add67c05dac9fe2c419d5}
           # export NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID=... # Optional
-
-          npm run build # This should now use the 'export' output defined in next.config.js
+          npm run build # This should use the 'export' output defined in next.config.js
         env:
-          # Define any build-time env vars needed here using repository secrets or variables
-          # Example using repository variables (preferred over secrets for non-sensitive keys)
           NEXT_PUBLIC_FIREBASE_API_KEY: ${{ vars.NEXT_PUBLIC_FIREBASE_API_KEY }}
           NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: ${{ vars.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN }}
           NEXT_PUBLIC_FIREBASE_PROJECT_ID: ${{ vars.NEXT_PUBLIC_FIREBASE_PROJECT_ID }}
@@ -69,17 +55,15 @@ jobs:
           NEXT_PUBLIC_FIREBASE_APP_ID: ${{ vars.NEXT_PUBLIC_FIREBASE_APP_ID }}
           # NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID: ${{ vars.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID }} # Optional
 
-      # Add this step for debugging: List the contents of the output directory
       - name: List output directory content
-        run: ls -R ./out || echo "'out' directory not found or empty"
+        run: ls -R ./out || echo "'out' directory not found or empty. Build might have failed."
 
       - name: Setup Pages
         uses: actions/configure-pages@v5
       - name: Upload artifact
-        uses: actions/upload-pages-artifact@v3 # Use v3 or later
+        uses: actions/upload-pages-artifact@v4 # Updated to v4
         with:
-          # Upload the exported content from the 'out' directory
-          path: './out' # Correct path for Next.js static export
+          path: './out'
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4

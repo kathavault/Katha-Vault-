@@ -4,10 +4,10 @@ import type {NextConfig} from 'next';
 const nextConfig: NextConfig = {
   /* config options here */
   typescript: {
-    ignoreBuildErrors: true,
+    ignoreBuildErrors: false, // Ensure build fails on TypeScript errors
   },
   eslint: {
-    ignoreDuringBuilds: true,
+    ignoreDuringBuilds: false, // Ensure build fails on ESLint errors
   },
   // ** Configure static export for GitHub Pages **
   output: 'export',

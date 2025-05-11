@@ -1,6 +1,8 @@
 // src/app/story/[slug]/page.tsx
-import { getStories } from '@/lib/storyService'; // Assuming this is the correct function for fetching story slugs
-import { Suspense } from 'react';
+import React, { Suspense } from 'react';
+import StoryDetailPage from './StoryDetailPage'; // Import the client component
+import { getStories } from '@/lib/storyService'; // For generateStaticParams
+import { Loader2 } from 'lucide-react';
 
 interface StoryPageResolvedParams {
     slug: string;
@@ -9,26 +11,24 @@ interface StoryPageProps {
     params: StoryPageResolvedParams;
 }
 
-
 export async function generateStaticParams(): Promise<StoryPageResolvedParams[]> {
+    console.log("generateStaticParams for /story/[slug] running...");
     try {
-        console.log("generateStaticParams for /story/[slug] running...");
-        // Ensure fetchStories is adapted or a new function is created to return only { slug: string } or full stories
         const stories = await getStories(); 
         if (!stories || stories.length === 0) {
-            console.warn("No stories returned from fetchStories() for generateStaticParams in /story/[slug].");
+            console.warn("No stories returned from getStories() for generateStaticParams in /story/[slug].");
             return [];
         }
         const params = stories
-            .map((story: { slug: any; }) => ({
-                slug: story.slug, // Assuming story object has a slug property
+            .map((story) => ({
+                slug: story.slug, 
             }))
-            .filter((param: { slug: string | any[]; }) => typeof param.slug === 'string' && param.slug.length > 0);
+            .filter((param) => typeof param.slug === 'string' && param.slug.length > 0);
 
-        console.log(`Generated ${params.length} static params for /story/[slug]:`, params.slice(0, 10));
+        console.log(`Generated ${params.length} static params for /story/[slug]. Sample:`, params.slice(0, 5));
         return params;
     } catch (error) {
-        console.error("Error fetching stories for generateStaticParams in /story/[slug]:", error);
+        console.error("Error in generateStaticParams for /story/[slug]:", error);
         return [];
     }
 }
@@ -38,13 +38,25 @@ const StoryPage = ({ params }: StoryPageProps) => {
     const { slug } = params;
 
     if (!slug) {
-        // This case should ideally not be hit if generateStaticParams works correctly for static export
-        // or if dynamic segment validation is in place.
-        return <div>Error: Story slug is missing.</div>;
+        // This case should ideally not be hit if generateStaticParams works correctly
+        return (
+            <div className="container mx-auto py-10 text-center">
+                <h1 className="text-2xl font-semibold text-destructive">Error: Story Not Found</h1>
+                <p className="text-muted-foreground">The story slug is missing or invalid.</p>
+            </div>
+        );
     }
 
+    // StoryDetailPage is a Client Component and will handle its own data fetching.
+    // We wrap it in Suspense for better UX during data loading.
     return (
-        <div>Story slug: {slug}</div> // Placeholder or alternative content
+        <Suspense fallback={
+            <div className="flex items-center justify-center min-h-[calc(100vh-200px)]">
+                <Loader2 className="h-12 w-12 animate-spin text-primary" />
+            </div>
+        }>
+            <StoryDetailPage slug={slug} />
+        </Suspense>
     );
 };
 

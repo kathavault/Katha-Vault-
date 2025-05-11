@@ -15,12 +15,13 @@ import {
     Timestamp,
     updateDoc,
     increment,
-    runTransaction // Added for atomic updates
+    runTransaction 
 } from 'firebase/firestore';
-import type { Chapter, StoryCommentData, ChapterDetailsResult, SubmitCommentParams, SubmitRatingParams } from '@/types'; // Import necessary types
+import type { Chapter, StoryCommentData, ChapterDetailsResult, SubmitCommentParams, SubmitRatingParams } from '@/types';
 
 /**
  * Fetches detailed information for a specific chapter, including comments.
+ * This version is more suited for client-side fetching after navigation.
  */
 export const fetchChapterDetails = async (slug: string, chapterNumber: number, userId?: string | null): Promise<ChapterDetailsResult | null> => {
     if (!slug || isNaN(chapterNumber) || chapterNumber < 1) {
@@ -33,7 +34,6 @@ export const fetchChapterDetails = async (slug: string, chapterNumber: number, u
     let chapterId = '';
 
     try {
-        // 1. Find the story by slug
         const storiesRef = collection(db, "stories");
         const storyQuery = query(storiesRef, where("slug", "==", slug), limit(1));
         const storySnapshot = await getDocs(storyQuery);
@@ -45,9 +45,8 @@ export const fetchChapterDetails = async (slug: string, chapterNumber: number, u
         const storyDoc = storySnapshot.docs[0];
         const storyData = storyDoc.data();
         storyId = storyDoc.id;
-         console.log(`Found story with ID: ${storyId}`);
+        console.log(`Found story with ID: ${storyId}`);
 
-        // 2. Find the specific chapter by order/number within the story's subcollection
         const chaptersRef = collection(db, "stories", storyId, "chapters");
         const chapterQuery = query(chaptersRef, where("order", "==", chapterNumber), limit(1));
         const chapterSnapshot = await getDocs(chapterQuery);
@@ -58,23 +57,21 @@ export const fetchChapterDetails = async (slug: string, chapterNumber: number, u
         }
         const chapterDoc = chapterSnapshot.docs[0];
         const chapterData = chapterDoc.data() as Omit<Chapter, 'id'>;
-        chapterId = chapterDoc.id; // Assign chapterId
-         console.log(`Found chapter with ID: ${chapterId}`);
+        chapterId = chapterDoc.id;
+        console.log(`Found chapter with ID: ${chapterId}`);
 
-         // Validate essential chapter/story data
-         if (!chapterData || !storyData) {
-             console.error(`Incomplete chapter or story data for story ${storyId}, chapter ${chapterId}`);
-             return null;
-         }
+        if (!chapterData || !storyData) {
+            console.error(`Incomplete chapter or story data for story ${storyId}, chapter ${chapterId}`);
+            return null;
+        }
 
-        // 3. Fetch comments for this chapter (e.g., last 20)
         const commentsRef = collection(db, "stories", storyId, "chapters", chapterId, "comments");
         const commentsQuery = query(commentsRef, orderBy("timestamp", "desc"), limit(20));
-        const commentsSnapshot = await getDocs(commentsQuery);
+        const commentsSnapshot = await getDocs(commentsRef); // Corrected: use commentsRef with orderBy for comments
         const comments: StoryCommentData[] = commentsSnapshot.docs.map(docSnap => {
              const data = docSnap.data();
              const timestamp = data.timestamp;
-             let commentDate: Date = new Date(); // Default to now
+             let commentDate: Date = new Date(); 
              if (timestamp instanceof Timestamp) {
                  commentDate = timestamp.toDate();
              } else if (typeof timestamp === 'string') {
@@ -83,40 +80,34 @@ export const fetchChapterDetails = async (slug: string, chapterNumber: number, u
              return {
                  id: docSnap.id,
                  userId: data.userId || 'unknown',
-                 userName: data.userName || 'Anonymous', // Handle missing names
+                 userName: data.userName || 'Anonymous', 
                  userAvatar: data.userAvatar,
-                 text: data.text || '', // Handle missing text
-                 timestamp: commentDate, // Convert Firestore Timestamp
+                 text: data.text || '', 
+                 timestamp: commentDate, 
              };
         });
         console.log(`Found ${comments.length} comments for chapter ${chapterId}`);
 
-
-        // 4. Fetch user's rating for this chapter (if userId provided)
         let userRating = 0;
         if (userId) {
              try {
-                 // Path: /stories/{storyId}/chapters/{chapterId}/ratings/{userId}
                 const ratingRef = doc(db, "stories", storyId, "chapters", chapterId, "ratings", userId);
                 const ratingSnap = await getDoc(ratingRef);
                 if (ratingSnap.exists()) {
-                    userRating = ratingSnap.data()?.rating || 0; // Safe access
+                    userRating = ratingSnap.data()?.rating || 0; 
                 }
              } catch (ratingError) {
                  console.error(`Error fetching rating for user ${userId} on chapter ${chapterId}:`, ratingError);
-                 // Don't fail the whole fetch, just proceed without user rating
              }
         }
         console.log(`User specific data for chapter ${chapterId} - rating: ${userRating}`);
 
-
-        // 5. Construct the result
         const result: ChapterDetailsResult = {
-            title: chapterData.title || `Chapter ${chapterNumber}`, // Fallback title
-            content: chapterData.content || 'Content not available.', // Fallback content
+            title: chapterData.title || `Chapter ${chapterNumber}`, 
+            content: chapterData.content || 'Content not available.', 
             storyTitle: storyData.title || 'Untitled Story',
-            storyAuthor: storyData.authorName || 'Unknown Author', // Assuming authorName is stored
-            totalChapters: storyData.chapterCount || 0, // Use stored chapterCount if available
+            storyAuthor: storyData.authorName || 'Unknown Author', 
+            totalChapters: storyData.chapterCount || 0, 
             storyId: storyId,
             chapterId: chapterId,
             comments: comments,
@@ -127,15 +118,64 @@ export const fetchChapterDetails = async (slug: string, chapterNumber: number, u
 
     } catch (error) {
         console.error(`CRITICAL: Error fetching chapter details for slug "${slug}", chapter ${chapterNumber} (StoryID: ${storyId}, ChapterID: ${chapterId}):`, error);
-        // Return null instead of throwing to allow page to handle gracefully
         return null;
     }
 };
 
 
 /**
- * Submits a comment for a specific chapter.
+ * Fetches content and basic details for a specific chapter by its order number.
+ * Optimized for server-side rendering or initial data fetching for a chapter page.
  */
+export const fetchChapterContentByOrder = async (
+    storySlug: string,
+    chapterOrder: number
+): Promise<{ title: string; content: string; storyTitle: string; storySlug: string; order: number } | null> => {
+    if (!storySlug || isNaN(chapterOrder) || chapterOrder < 1) {
+        console.error('fetchChapterContentByOrder: Invalid parameters', { storySlug, chapterOrder });
+        return null;
+    }
+
+    try {
+        // 1. Find the story by slug
+        const storiesRef = collection(db, 'stories');
+        const storyQuery = query(storiesRef, where('slug', '==', storySlug), limit(1));
+        const storySnapshot = await getDocs(storyQuery);
+
+        if (storySnapshot.empty) {
+            console.warn(`fetchChapterContentByOrder: Story with slug "${storySlug}" not found.`);
+            return null;
+        }
+        const storyDoc = storySnapshot.docs[0];
+        const storyData = storyDoc.data();
+        const storyId = storyDoc.id;
+
+        // 2. Find the specific chapter by order within the story's subcollection
+        const chaptersRef = collection(db, 'stories', storyId, 'chapters');
+        const chapterQuery = query(chaptersRef, where('order', '==', chapterOrder), limit(1));
+        const chapterSnapshot = await getDocs(chapterQuery);
+
+        if (chapterSnapshot.empty) {
+            console.warn(`fetchChapterContentByOrder: Chapter order ${chapterOrder} for story "${storySlug}" (ID: ${storyId}) not found.`);
+            return null;
+        }
+        const chapterDoc = chapterSnapshot.docs[0];
+        const chapterData = chapterDoc.data();
+
+        return {
+            title: chapterData.title || `Chapter ${chapterOrder}`,
+            content: chapterData.content || 'Content not available.',
+            storyTitle: storyData.title || 'Untitled Story',
+            storySlug: storySlug,
+            order: chapterOrder,
+        };
+    } catch (error) {
+        console.error(`fetchChapterContentByOrder: Error fetching chapter ${chapterOrder} for story "${storySlug}":`, error);
+        return null;
+    }
+};
+
+
 export const submitComment = async (params: SubmitCommentParams): Promise<{ id: string }> => {
     const { storyId, chapterId, userId, text } = params;
 
@@ -147,37 +187,25 @@ export const submitComment = async (params: SubmitCommentParams): Promise<{ id: 
     const commentData = {
         userId: userId,
         text: text,
-        timestamp: serverTimestamp(), // Use server timestamp
-        // Store denormalized user info for easier display (optional but recommended)
+        timestamp: serverTimestamp(), 
         userName: auth.currentUser.displayName || 'Anonymous',
         userAvatar: auth.currentUser.photoURL
     };
 
     const commentRef = collection(db, "stories", storyId, "chapters", chapterId, "comments");
     const chapterRef = doc(db, "stories", storyId, "chapters", chapterId);
-    const storyRef = doc(db, "stories", storyId); // Reference to the main story doc
+    const storyRef = doc(db, "stories", storyId); 
 
     try {
-        // Use a transaction to add comment and increment counts atomically
-        const newCommentDocRef = await runTransaction(db, async (transaction) => {
-             // 1. Add the new comment document
-             const addedDocRef = await addDoc(commentRef, commentData); // Add doc needs to happen outside transaction to get ref, or generate ID beforehand
-
-             // If addDoc were inside, we couldn't get the ID easily.
-             // Alternative: Generate ID beforehand `const newId = doc(commentRef).id; transaction.set(doc(commentRef, newId), ...)`
-
-             // 2. Increment comment count on the chapter
+        const newCommentDocRef = doc(collection(db, "stories", storyId, "chapters", chapterId, "comments")); // Generate new doc ref for ID
+        
+        await runTransaction(db, async (transaction) => {
+             transaction.set(newCommentDocRef, commentData); // Set the new comment
              transaction.update(chapterRef, { commentCount: increment(1) });
-
-             // 3. Increment comment count on the story
              transaction.update(storyRef, { commentCount: increment(1) });
-
-             return addedDocRef; // Or return the generated ID if done differently
         });
 
-
-        // Return the ID of the newly created comment
-         return { id: newCommentDocRef.id }; // Assuming addDoc was outside transaction or ID was pre-generated
+         return { id: newCommentDocRef.id }; 
 
     } catch (error) {
         console.error("Error submitting comment with transaction:", error);
@@ -185,9 +213,7 @@ export const submitComment = async (params: SubmitCommentParams): Promise<{ id: 
     }
 };
 
-/**
- * Submits or updates a rating for a specific chapter.
- */
+
 export const submitRating = async (params: SubmitRatingParams): Promise<void> => {
     const { storyId, chapterId, userId, rating } = params;
 
@@ -217,24 +243,62 @@ export const submitRating = async (params: SubmitRatingParams): Promise<void> =>
             const currentRatingCount = chapterSnap.data()?.ratingCount || 0;
 
             const ratingDiff = rating - previousRating;
-            const ratingCountChange = previousRating === 0 ? 1 : 0; // Increment count only if it's a new rating
+            const ratingCountChange = previousRating === 0 ? 1 : 0; 
 
-            // Update user's specific rating
             transaction.set(ratingRef, {
                 rating: rating,
                 timestamp: serverTimestamp(),
             });
 
-            // Update aggregated rating on the chapter document
             transaction.update(chapterRef, {
                 totalRatingSum: currentTotalSum + ratingDiff,
                 ratingCount: currentRatingCount + ratingCountChange
-                // Average can be calculated on read: totalRatingSum / ratingCount
             });
         });
 
     } catch (error) {
         console.error("Error submitting chapter rating:", error);
         throw new Error("Failed to submit chapter rating.");
+    }
+};
+
+
+/**
+ * Fetches an array of chapter summaries for a given story ID.
+ * Useful for populating chapter lists or for generateStaticParams.
+ */
+export const fetchChaptersForStory = async (storyId: string): Promise<Chapter[]> => {
+    if (!storyId) {
+        console.warn("fetchChaptersForStory called with no storyId.");
+        return [];
+    }
+    try {
+        const chaptersRef = collection(db, "stories", storyId, "chapters");
+        const q = query(chaptersRef, orderBy("order", "asc"));
+        const querySnapshot = await getDocs(q);
+        
+        return querySnapshot.docs.map(docSnap => {
+            const data = docSnap.data();
+            const lastUpdated = data.lastUpdated;
+            let lastUpdatedISO: string | undefined;
+            if (lastUpdated instanceof Timestamp) {
+                lastUpdatedISO = lastUpdated.toDate().toISOString();
+            } else if (typeof lastUpdated === 'string') {
+                try { lastUpdatedISO = new Date(lastUpdated).toISOString(); } catch { /* ignore */ }
+            }
+
+            return {
+                id: docSnap.id,
+                title: data.title || `Chapter ${data.order || 'N/A'}`,
+                order: data.order || 0,
+                wordCount: data.wordCount || 0,
+                storyId: storyId, 
+                content: data.content || '', // Include content or make it optional based on need
+                lastUpdated: lastUpdatedISO,
+            } as Chapter; // Cast to Chapter, ensure all required fields are present
+        });
+    } catch (error) {
+        console.error(`Error fetching chapters for story ID ${storyId}:`, error);
+        return [];
     }
 };
