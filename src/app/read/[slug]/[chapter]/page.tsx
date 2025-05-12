@@ -1,34 +1,34 @@
-import React, { Suspense } from 'react';
-import { getStories, fetchStoryDetails } from '@/lib/storyService'; // For generateStaticParams
-import { fetchChapterContentByOrder } from '@/lib/readerService'; // For fetching chapter content
-import ContentRenderer from './ContentRenderer';
-import { Loader2, AlertTriangle } from 'lucide-react';
-import Link from 'next/link';
-import { Button } from '@/components/ui/button';
-import ChapterNavigation from './ChapterNavigation'; // Component for Next/Prev chapter links
+import { GetServerSideProps } from 'next';
 
-interface PageProps {
-  params: { slug: string; chapter: string }; // chapter is chapterOrder string
+type Params = {
+  slug: string;
+  chapter: string;
+};
+
+type PageProps = {
+  params: Params; // Ensure this matches your expected structure
+};
+
+export default function Page({ params }: Awaited<PageProps>) {
+  const { slug, chapter } = params;
+
+  return (
+    <div>
+      <h1>Reading Chapter {chapter} from {slug}</h1>
+    </div>
+  );
 }
 
-export async function generateStaticParams(): Promise<{ slug: string; chapter: string }[]> {
-  console.log("Generating static params for /read/[slug]/[chapter]...");
-  try {
-    const stories = await getStories(); // Gets { id, slug } for published stories
-    if (!stories || stories.length === 0) {
-      console.warn("No stories found for generateStaticParams in /read page.");
-      return [];
-    }
+// If you are using getServerSideProps or similar, ensure the params match
+export const getServerSideProps: GetServerSideProps = async (context) => {
+  const { slug, chapter } = context.params as Params;
 
-    const allParams: { slug: string; chapter: string }[] = [];
-
-    for (const story of stories) {
-      if (!story.slug || !story.id) {
-        console.warn(`Story with ID ${story.id} has no slug. Skipping.`);
-        continue;
-      }
-
-      // Fetch full story details to get chapter information
+  return {
+    props: {
+      params: { slug, chapter },
+    },
+  };
+};
       const storyDetails = await fetchStoryDetails(story.slug, null); // null for userId, not relevant for params generation
 
       if (storyDetails && storyDetails.chaptersData && storyDetails.chaptersData.length > 0) {
