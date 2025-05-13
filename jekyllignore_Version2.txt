@@ -1,0 +1,18 @@
+# Exclude Node.js modules
+node_modules/
+
+# Exclude build artifacts
+_dist/
+_site/
+
+# Exclude log files and temporary files
+*.log
+*.tmp
+
+# Exclude unnecessary files
+.DS_Store
+Thumbs.db
+
+# Exclude specific directories
+functions/node_modules/
+CNAME
